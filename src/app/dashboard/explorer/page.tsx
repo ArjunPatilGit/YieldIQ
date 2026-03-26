@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useUser, useFirestore, useDoc, useMemoFirebase } from "@/firebase";
-import { doc } from "firebase/firestore";
+import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from "@/firebase";
+import { doc, collection } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Database, User, Home, Shield, Search, Info, AlertCircle, Key } from "lucide-react";
+import { Database, User, Home, Shield, Search, Info, AlertCircle, Key, FileText } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -26,8 +26,14 @@ export default function DatabaseExplorerPage() {
     return doc(db, "users", user.uid, "farms", "primary");
   }, [db, user]);
 
+  const reportsQuery = useMemoFirebase(() => {
+    if (!db || !user) return null;
+    return collection(db, "users", user.uid, "advisory_reports");
+  }, [db, user]);
+
   const { data: profileData, isLoading: isProfileLoading, error: profileError } = useDoc(profileRef);
   const { data: farmData, isLoading: isFarmLoading, error: farmError } = useDoc(farmRef);
+  const { data: reportsData, isLoading: isReportsLoading } = useCollection(reportsQuery);
 
   const filterData = (data: any) => {
     if (!data) return [];
@@ -58,9 +64,8 @@ export default function DatabaseExplorerPage() {
         <AlertTitle className="font-bold">Privacy & Transparency Report</AlertTitle>
         <AlertDescription className="text-sm leading-relaxed">
           The following tables represent the raw data stored in YieldIQ's Firestore cluster. 
-          As per administrative requirements, your <strong>Login Details</strong> (UID, Email, Name) are visible for account management. 
           <span className="flex items-center gap-1 mt-2 font-semibold">
-            <Key className="h-3 w-3" /> Passwords are never stored in this database and remain encrypted in Firebase Auth.
+            <Key className="h-3 w-3" /> Passwords are never stored in this database.
           </span>
         </AlertDescription>
       </Alert>
@@ -76,63 +81,45 @@ export default function DatabaseExplorerPage() {
       </div>
 
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
+        <TabsList className="grid w-full grid-cols-3 lg:w-[600px]">
           <TabsTrigger value="profile" className="gap-2">
             <User className="h-4 w-4" />
-            Login & Profile
+            Profile
           </TabsTrigger>
           <TabsTrigger value="farm" className="gap-2">
             <Home className="h-4 w-4" />
-            Farm Assets
+            Farm
+          </TabsTrigger>
+          <TabsTrigger value="reports" className="gap-2">
+            <FileText className="h-4 w-4" />
+            AI Reports
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile" className="mt-4">
           <Card className="border-primary/10">
             <CardHeader className="pb-2">
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="text-lg">UserProfile Document</CardTitle>
-                  <CardDescription className="font-mono text-[10px]">Path: /users/{user?.uid}</CardDescription>
-                </div>
-                <Badge variant="outline" className="text-[10px]">Auth Context</Badge>
-              </div>
+              <CardTitle className="text-lg">UserProfile</CardTitle>
+              <CardDescription className="font-mono text-[10px]">Path: /users/{user?.uid}</CardDescription>
             </CardHeader>
             <CardContent>
-              {profileError && (
-                <div className="flex items-center gap-2 p-3 mb-4 text-xs text-destructive bg-destructive/5 border border-destructive/10 rounded">
-                  <AlertCircle className="h-4 w-4" />
-                  Connection Error: {profileError.message}
-                </div>
-              )}
+              {profileError && <p className="text-xs text-destructive">Error: {profileError.message}</p>}
               <Table>
                 <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="w-[200px] text-xs uppercase tracking-wider">Field Name</TableHead>
-                    <TableHead className="text-xs uppercase tracking-wider">Cloud Value</TableHead>
-                    <TableHead className="text-right text-xs uppercase tracking-wider">Data Type</TableHead>
+                  <TableRow>
+                    <TableHead className="w-[200px] text-xs uppercase">Field</TableHead>
+                    <TableHead className="text-xs uppercase">Value</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isProfileLoading ? (
-                    <TableRow><TableCell colSpan={3} className="text-center py-12">Synchronizing with primary node...</TableCell></TableRow>
-                  ) : filterData(profileData).length > 0 ? (
-                    filterData(profileData).map(([key, value]) => (
-                      <TableRow key={key} className="group">
-                        <TableCell className="font-mono text-xs font-semibold text-primary/80 group-hover:text-primary">{key}</TableCell>
-                        <TableCell className="max-w-[400px] truncate font-medium text-sm">
-                          {value instanceof Object ? (
-                            <code className="text-[10px] bg-muted p-1 rounded">JSON_OBJECT</code>
-                          ) : String(value)}
-                        </TableCell>
-                        <TableCell className="text-right text-[10px] font-mono text-muted-foreground italic">
-                          {typeof value}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow><TableCell colSpan={3} className="text-center py-16 text-muted-foreground italic">No searchable profile fields discovered.</TableCell></TableRow>
-                  )}
+                    <TableRow><TableCell colSpan={2}>Syncing...</TableCell></TableRow>
+                  ) : filterData(profileData).map(([key, value]) => (
+                    <TableRow key={key}>
+                      <TableCell className="font-mono text-xs text-primary">{key}</TableCell>
+                      <TableCell className="text-sm">{String(value)}</TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             </CardContent>
@@ -142,57 +129,62 @@ export default function DatabaseExplorerPage() {
         <TabsContent value="farm" className="mt-4">
           <Card className="border-primary/10">
             <CardHeader className="pb-2">
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="text-lg">Farm Asset Document</CardTitle>
-                  <CardDescription className="font-mono text-[10px]">Path: .../farms/primary</CardDescription>
-                </div>
-                <Badge variant="secondary" className="text-[10px]">Agricultural Data</Badge>
-              </div>
+              <CardTitle className="text-lg">Farm Asset</CardTitle>
+              <CardDescription className="font-mono text-[10px]">Path: .../farms/primary</CardDescription>
             </CardHeader>
             <CardContent>
-              {farmError && (
-                <div className="flex items-center gap-2 p-3 mb-4 text-xs text-destructive bg-destructive/5 border border-destructive/10 rounded">
-                  <AlertCircle className="h-4 w-4" />
-                  Access Denied: Ensure email is verified to read nested assets.
-                </div>
-              )}
+              {farmError && <p className="text-xs text-destructive">Verify email to access farm data.</p>}
               <Table>
                 <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="w-[200px] text-xs uppercase tracking-wider">Field Name</TableHead>
-                    <TableHead className="text-xs uppercase tracking-wider">Cloud Value</TableHead>
-                    <TableHead className="text-right text-xs uppercase tracking-wider">Data Type</TableHead>
+                  <TableRow>
+                    <TableHead className="w-[200px] text-xs uppercase">Field</TableHead>
+                    <TableHead className="text-xs uppercase">Value</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isFarmLoading ? (
-                    <TableRow><TableCell colSpan={3} className="text-center py-12">Querying farm collection...</TableCell></TableRow>
-                  ) : filterData(farmData).length > 0 ? (
-                    filterData(farmData).map(([key, value]) => (
-                      <TableRow key={key} className="group">
-                        <TableCell className="font-mono text-xs font-semibold text-accent-foreground group-hover:text-accent-foreground/80">{key}</TableCell>
-                        <TableCell className="max-w-[400px] truncate font-medium text-sm italic">
-                          {String(value)}
-                        </TableCell>
-                        <TableCell className="text-right text-[10px] font-mono text-muted-foreground italic">
-                          {typeof value}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={3} className="text-center py-20 text-muted-foreground">
-                        <div className="flex flex-col items-center gap-2">
-                          <Home className="h-8 w-8 opacity-20" />
-                          <p>No farm records found in the cloud.</p>
-                          <p className="text-[10px]">Visit "Farm Profile" to initialize your database.</p>
-                        </div>
-                      </TableCell>
+                    <TableRow><TableCell colSpan={2}>Syncing...</TableCell></TableRow>
+                  ) : filterData(farmData).map(([key, value]) => (
+                    <TableRow key={key}>
+                      <TableCell className="font-mono text-xs text-accent-foreground">{key}</TableCell>
+                      <TableCell className="text-sm">{String(value)}</TableCell>
                     </TableRow>
-                  )}
+                  ))}
                 </TableBody>
               </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="reports" className="mt-4">
+          <Card className="border-primary/10">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Advisory Reports</CardTitle>
+              <CardDescription className="font-mono text-[10px]">Path: .../advisory_reports/</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isReportsLoading ? (
+                <p className="text-sm text-center py-8">Fetching reports...</p>
+              ) : reportsData && reportsData.length > 0 ? (
+                <div className="space-y-4">
+                  {reportsData.map((report) => (
+                    <div key={report.id} className="p-4 rounded-lg border bg-muted/20">
+                      <div className="flex justify-between items-start mb-2">
+                        <Badge variant="outline">ID: {report.id.substring(0, 8)}...</Badge>
+                        <span className="text-[10px] text-muted-foreground">
+                          {report.generatedAt?.toDate?.()?.toLocaleString() || "Recent"}
+                        </span>
+                      </div>
+                      <p className="text-sm font-semibold text-primary">{report.advisorySummary}</p>
+                      <p className="text-[10px] text-muted-foreground mt-2 truncate">
+                        {report.waterOptimization}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-center py-12 text-muted-foreground italic">No AI reports generated yet.</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
