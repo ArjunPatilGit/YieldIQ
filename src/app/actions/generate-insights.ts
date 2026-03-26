@@ -3,12 +3,12 @@
  */
 'use server';
 
-import { parseWaterReportFlow } from '@/ai/flows/parse-water-report-flow';
+import { parseWaterReport } from '@/ai/flows/parse-water-report-flow';
 import { computeAgronomyScores } from '@/lib/agronomy/compute-scores';
-import { farmingAdvisoryFlow } from '@/ai/flows/personalized-farming-advisory-flow';
+import { personalizedFarmingAdvisory } from '@/ai/flows/personalized-farming-advisory-flow';
 import { getWeatherData } from '@/lib/weather';
-import { initializeFirebase, getSdks } from '@/firebase';
-import { doc, getDoc, updateDoc, setDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { initializeFirebase } from '@/firebase';
+import { doc, getDoc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 export async function generateInsights(userId: string, photoDataUri?: string) {
   const { firestore } = initializeFirebase();
@@ -23,7 +23,7 @@ export async function generateInsights(userId: string, photoDataUri?: string) {
   // 2. Parse Report if provided
   let waterReport = farm.waterReport;
   if (photoDataUri) {
-    waterReport = await parseWaterReportFlow({ photoDataUri });
+    waterReport = await parseWaterReport({ photoDataUri });
     await updateDoc(farmRef, {
       waterReport,
       waterReportUploadDate: new Date().toISOString(),
@@ -52,7 +52,7 @@ export async function generateInsights(userId: string, photoDataUri?: string) {
   });
 
   // 5. Generate AI advisory
-  const advisory = await farmingAdvisoryFlow({
+  const advisory = await personalizedFarmingAdvisory({
     farm,
     computed,
     weather,

@@ -1,12 +1,16 @@
 'use server';
 /**
  * @fileOverview Genkit flow for parsing agricultural lab reports (water/soil).
+ * 
+ * - parseWaterReport - Server action to extract data from reports.
+ * - WaterReport - The output type representing the parsed data.
+ * - ParseWaterReportInput - The input type for the parsing flow.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 
-export const WaterReportSchema = z.object({
+const WaterReportSchema = z.object({
   reportDate: z.string().optional(),
   waterSource: z.string().optional(),
   sampleType: z.string().optional(),
@@ -45,14 +49,7 @@ const ParseWaterReportInputSchema = z.object({
 
 export type ParseWaterReportInput = z.infer<typeof ParseWaterReportInputSchema>;
 
-/**
- * Server action wrapper for the water report parsing flow.
- */
-export async function parseWaterReport(input: ParseWaterReportInput): Promise<WaterReport> {
-  return parseWaterReportFlow(input);
-}
-
-export const parseWaterReportFlow = ai.defineFlow(
+const parseWaterReportFlow = ai.defineFlow(
   {
     name: 'parseWaterReportFlow',
     inputSchema: ParseWaterReportInputSchema,
@@ -76,3 +73,10 @@ export const parseWaterReportFlow = ai.defineFlow(
     return output;
   }
 );
+
+/**
+ * Server action wrapper for the water report parsing flow.
+ */
+export async function parseWaterReport(input: ParseWaterReportInput): Promise<WaterReport> {
+  return parseWaterReportFlow(input);
+}

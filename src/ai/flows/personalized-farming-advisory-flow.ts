@@ -1,12 +1,16 @@
 'use server';
 /**
  * @fileOverview Advanced Genkit flow for generating scientifically-backed farming advisory.
+ * 
+ * - personalizedFarmingAdvisory - Server action to generate the advisory report.
+ * - AdvisoryOutput - The output type for the advisory.
+ * - AdvisoryInput - The input type for the advisory flow.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 
-export const AdvisoryOutputSchema = z.object({
+const AdvisoryOutputSchema = z.object({
   predictedYieldSummary: z.object({
     display: z.string(),
     changeText: z.string().optional(),
@@ -64,14 +68,7 @@ const AdvisoryInputSchema = z.object({
 
 export type AdvisoryInput = z.infer<typeof AdvisoryInputSchema>;
 
-/**
- * Server action wrapper for the farming advisory flow.
- */
-export async function personalizedFarmingAdvisory(input: AdvisoryInput): Promise<AdvisoryOutput> {
-  return farmingAdvisoryFlow(input);
-}
-
-export const farmingAdvisoryFlow = ai.defineFlow(
+const farmingAdvisoryFlow = ai.defineFlow(
   {
     name: 'farmingAdvisoryFlow',
     inputSchema: AdvisoryInputSchema,
@@ -108,3 +105,10 @@ export const farmingAdvisoryFlow = ai.defineFlow(
     return output!;
   }
 );
+
+/**
+ * Server action wrapper for the farming advisory flow.
+ */
+export async function personalizedFarmingAdvisory(input: AdvisoryInput): Promise<AdvisoryOutput> {
+  return farmingAdvisoryFlow(input);
+}
