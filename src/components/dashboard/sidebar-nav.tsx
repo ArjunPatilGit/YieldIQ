@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -10,7 +11,8 @@ import {
   MessageSquare, 
   Map as MapIcon, 
   Bell, 
-  FileText 
+  FileText,
+  Database
 } from "lucide-react";
 
 const items = [
@@ -23,11 +25,6 @@ const items = [
     title: "Farm Profile",
     href: "/dashboard/farm-profile",
     icon: UserCircle,
-  },
-  {
-    title: "Yield Analysis",
-    href: "/dashboard/analysis",
-    icon: LineChart,
   },
   {
     title: "Advisory Reports",
@@ -43,6 +40,11 @@ const items = [
     title: "GIS Visualization",
     href: "/dashboard/map",
     icon: MapIcon,
+  },
+  {
+    title: "Database Explorer",
+    href: "/dashboard/explorer",
+    icon: Database,
   },
   {
     title: "Alerts",
