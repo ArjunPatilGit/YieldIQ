@@ -1,3 +1,28 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "hero-farm",
+      "description": "Lush green wheat field during sunset",
+      "imageUrl": "https://picsum.photos/seed/farm1/1200/600",
+      "imageHint": "green farm"
+    },
+    {
+      "id": "crop-analysis",
+      "description": "Farmer checking crop health with a tablet",
+      "imageUrl": "https://picsum.photos/seed/farm2/800/600",
+      "imageHint": "farmer technology"
+    },
+    {
+      "id": "soil-test",
+      "description": "Soil sample in hands for testing",
+      "imageUrl": "https://picsum.photos/seed/farm3/800/600",
+      "imageHint": "soil testing"
+    },
+    {
+      "id": "drone-view",
+      "description": "Aerial view of organized farmland",
+      "imageUrl": "https://picsum.photos/seed/farm4/800/600",
+      "imageHint": "aerial farmland"
+    }
+  ]
 }
