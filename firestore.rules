@@ -6,26 +6,9 @@ service cloud.firestore {
      * YieldIQ Security Rules
      * 
      * Philosophy:
-     * This ruleset enforces a strict user-ownership model where most data is nested under 
-     * the /users/{userId} path. This ensures natural data segregation and simplifies 
-     * authorization logic for list operations (Query Authorization Principle).
-     * 
-     * Data Structure:
-     * - Private Data: Nested under /users/{userId}/... (Farms, Fields, Planting Cycles, etc.)
-     * - Global Catalogs: Root-level collections (CropTypes, Seasons, ConsultantProfiles) 
-     *   which are read-only for general users.
-     * 
-     * Key Security Decisions:
-     * 1. Authorization Independence: Critical fields like 'ownerId' or 'userId' are 
-     *    enforced at the document level to ensure that security checks do not require 
-     *    expensive cross-document lookups (get() calls).
-     * 2. Verified Identity: Access to most features requires an authenticated user 
-     *    with a verified email address, as per the application requirements.
-     * 3. Prototyping Flexibility: While ownership and relational integrity are strictly 
-     *    enforced, the internal schema (data types, non-relational fields) is flexible 
-     *    to allow for rapid development iteration.
-     * 4. Relational Consistency: Rules ensure that internal 'id' or 'userId' fields 
-     *    in the document data match the authenticated user and the document path.
+     * This ruleset enforces a strict user-ownership model. 
+     * - Users can manage their own UserProfile immediately upon signup (to allow profile creation).
+     * - Sensitive farm data and AI features require a verified email address.
      */
 
     // --- Helper Functions ---
@@ -40,17 +23,17 @@ service cloud.firestore {
       return request.auth.token.email_verified == true;
     }
 
+    /** @description Checks if the authenticated user's UID matches the provided userId. */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
     /** @description Combined check for a valid, verified active user. */
     function isVerifiedUser() {
       return isSignedIn() && isEmailVerified();
     }
 
-    /** @description Checks if the authenticated user's UID matches the provided userId. */
-    function isOwner(userId) {
-      return isVerifiedUser() && request.auth.uid == userId;
-    }
-
-    /** @description Checks if the user is the owner and the document exists (for updates/deletes). */
+    /** @description Checks if the user is the owner and the document exists. */
     function isExistingOwner(userId) {
       return isOwner(userId) && resource != null;
     }
@@ -63,170 +46,104 @@ service cloud.firestore {
     // --- Collection Rules ---
 
     /**
-     * @description Rules for the UserProfile entity. Users can only manage their own profile.
-     * @path /users/{userId}
-     * @allow (create) auth.uid 'abc' creates /users/abc
-     * @deny (get) auth.uid 'abc' tries to read /users/xyz
-     * @principle Ownership and Self-Creation
+     * @description Rules for the UserProfile entity. 
+     * Users can manage their own profile regardless of verification status
+     * to ensure signup and verification flows work correctly.
      */
     match /users/{userId} {
-      allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isExistingOwner(userId) && isUnchanged('id');
-      allow delete: if isExistingOwner(userId);
+      allow get, list, create, update, delete: if isOwner(userId);
 
       /**
-       * @description Rules for Farms. Farmers own and manage their farms.
-       * @path /users/{userId}/farms/{farmId}
-       * @allow (list) auth.uid 'abc' listing /users/abc/farms
-       * @deny (create) auth.uid 'abc' sets ownerId to 'xyz'
-       * @principle Path-based ownership with internal ID validation.
+       * @description Rules for Farms. Requires email verification for access.
        */
       match /farms/{farmId} {
-        allow get, list: if isOwner(userId);
-        allow create: if isOwner(userId) && request.resource.data.ownerId == userId;
-        allow update: if isExistingOwner(userId) && isUnchanged('ownerId');
-        allow delete: if isExistingOwner(userId);
+        allow get, list: if isOwner(userId) && isEmailVerified();
+        allow create: if isOwner(userId) && isEmailVerified() && request.resource.data.ownerId == userId;
+        allow update, delete: if isOwner(userId) && isEmailVerified();
 
         /**
-         * @description Rules for Fields within a farm.
-         * @path /users/{userId}/farms/{farmId}/fields/{fieldId}
+         * @description Rules for Fields and nested cycles.
          */
         match /fields/{fieldId} {
-          allow get, list: if isOwner(userId);
-          allow create: if isOwner(userId);
-          allow update, delete: if isExistingOwner(userId);
+          allow get, list, create, update, delete: if isOwner(userId) && isEmailVerified();
 
-          /**
-           * @description Rules for PlantingCycles, tracking crop lifecycle.
-           * @path /users/{userId}/farms/{farmId}/fields/{fieldId}/planting_cycles/{plantingCycleId}
-           */
           match /planting_cycles/{plantingCycleId} {
-            allow get, list: if isOwner(userId);
-            allow create: if isOwner(userId);
-            allow update, delete: if isExistingOwner(userId);
+            allow get, list, create, update, delete: if isOwner(userId) && isEmailVerified();
 
             match /recommendations/{recommendationId} {
-              allow get, list: if isOwner(userId);
-              allow create: if isOwner(userId);
-              allow update, delete: if isExistingOwner(userId);
+              allow get, list, create, update, delete: if isOwner(userId) && isEmailVerified();
             }
 
             match /action_logs/{actionLogId} {
-              allow get, list: if isOwner(userId);
-              allow create: if isOwner(userId);
-              allow update, delete: if isExistingOwner(userId);
+              allow get, list, create, update, delete: if isOwner(userId) && isEmailVerified();
             }
 
             match /advisory_reports/{advisoryReportId} {
-              allow get, list: if isOwner(userId);
-              allow create: if isOwner(userId);
-              allow update, delete: if isExistingOwner(userId);
+              allow get, list, create, update, delete: if isOwner(userId) && isEmailVerified();
             }
           }
 
           match /weather_data_points/{weatherDataPointId} {
-            allow get, list: if isOwner(userId);
-            allow create: if isOwner(userId);
-            allow update, delete: if isExistingOwner(userId);
+            allow get, list, create, update, delete: if isOwner(userId) && isEmailVerified();
           }
 
           match /soil_samples/{soilSampleId} {
-            allow get, list: if isOwner(userId);
-            allow create: if isOwner(userId);
-            allow update, delete: if isExistingOwner(userId);
+            allow get, list, create, update, delete: if isOwner(userId) && isEmailVerified();
           }
 
           match /satellite_imagery_analysis/{analysisId} {
-            allow get, list: if isOwner(userId);
-            allow create: if isOwner(userId);
-            allow update, delete: if isExistingOwner(userId);
+            allow get, list, create, update, delete: if isOwner(userId) && isEmailVerified();
           }
         }
       }
 
       /**
        * @description Rules for User Notifications.
-       * @path /users/{userId}/notifications/{notificationId}
        */
       match /notifications/{notificationId} {
-        allow get, list: if isOwner(userId);
-        allow create: if isOwner(userId) && request.resource.data.userId == userId;
-        allow update, delete: if isExistingOwner(userId);
+        allow get, list, create, update, delete: if isOwner(userId) && isEmailVerified();
       }
 
       /**
-       * @description Rules for Conversation Logs with AI assistant.
-       * @path /users/{userId}/conversation_logs/{logId}
+       * @description Rules for Conversation Logs.
        */
       match /conversation_logs/{logId} {
-        allow get, list: if isOwner(userId);
-        allow create: if isOwner(userId) && request.resource.data.userId == userId;
-        allow update, delete: if isExistingOwner(userId);
+        allow get, list, create, update, delete: if isOwner(userId) && isEmailVerified();
       }
 
       /**
-       * @description Rules for Consultation Requests. Accessible by farmer (owner) 
-       * and potentially by consultants via collectionGroup (handled below).
-       * @path /users/{userId}/consultation_requests/{requestId}
+       * @description Rules for Consultation Requests.
        */
       match /consultation_requests/{requestId} {
-        allow get, list: if isOwner(userId);
-        allow create: if isOwner(userId) && request.resource.data.userId == userId;
-        allow update: if isExistingOwner(userId) && isUnchanged('userId');
-        allow delete: if isExistingOwner(userId);
+        allow get, list, create, update, delete: if isOwner(userId) && isEmailVerified();
 
         match /sessions/{sessionId} {
-          allow get, list: if isOwner(userId);
-          allow create: if isOwner(userId);
-          allow update, delete: if isExistingOwner(userId);
+          allow get, list, create, update, delete: if isOwner(userId) && isEmailVerified();
         }
       }
     }
 
     /**
-     * @description Global catalog of Crop Types. Public read for all verified users.
-     * @path /crop_types/{cropTypeId}
-     * @allow (get) Any verified user reads a crop type.
-     * @deny (create) Any user tries to add a new crop type.
-     * @principle Public Read with Admin-only Writes (Writes currently denied).
+     * @description Global catalogs. Public read for verified users.
      */
     match /crop_types/{cropTypeId} {
       allow get, list: if isVerifiedUser();
-      allow create, update, delete: if false; // Admin-only
     }
 
-    /**
-     * @description Global catalog of Seasons. Public read for all verified users.
-     * @path /seasons/{seasonId}
-     */
     match /seasons/{seasonId} {
       allow get, list: if isVerifiedUser();
-      allow create, update, delete: if false; // Admin-only
     }
 
-    /**
-     * @description Directory of Crop Consultants. Public read for all verified users.
-     * @path /consultant_profiles/{consultantId}
-     */
     match /consultant_profiles/{consultantId} {
       allow get, list: if isVerifiedUser();
-      allow create, update, delete: if false; // Admin-only
     }
 
-    // --- Collection Group Rules (Cross-Path Queries) ---
+    // --- Collection Group Rules ---
 
-    /**
-     * @description Allows consultants to find requests assigned to them across all user paths.
-     */
     match /{path=**}/consultation_requests/{requestId} {
       allow get, list: if isVerifiedUser() && resource.data.consultantId == request.auth.uid;
     }
 
-    /**
-     * @description Allows consultants to find sessions assigned to them across all user paths.
-     */
     match /{path=**}/sessions/{sessionId} {
       allow get, list: if isVerifiedUser() && resource.data.consultantId == request.auth.uid;
     }
