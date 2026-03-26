@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useUser, useFirestore, useDoc, useMemoFirebase } from "@/firebase";
@@ -12,10 +11,12 @@ import {
   AlertTriangle, 
   Calendar,
   ArrowRight,
-  Loader2
+  Loader2,
+  Info
 } from "lucide-react";
 import Link from "next/link";
 import { YieldOverviewChart } from "@/components/dashboard/yield-overview-chart";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function Dashboard() {
   const { user } = useUser();
@@ -33,7 +34,7 @@ export default function Dashboard() {
     return doc(db, "users", user.uid, "farms", "primary");
   }, [db, user]);
 
-  const { data: farmData } = useDoc(farmRef);
+  const { data: farmData, isLoading: isFarmLoading } = useDoc(farmRef);
 
   const today = new Date().toLocaleDateString('en-US', { 
     month: 'long', 
@@ -67,6 +68,19 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {!farmData && !isFarmLoading && (
+        <Alert className="bg-accent/5 border-accent/20">
+          <Info className="h-4 w-4 text-accent" />
+          <AlertTitle>Setup Required</AlertTitle>
+          <AlertDescription className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <span>You haven't initialized your farm profile yet. Complete your profile to see AI-driven insights.</span>
+            <Button size="sm" asChild>
+              <Link href="/dashboard/farm-profile">Complete Profile</Link>
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Quick Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-primary/5 border-primary/20">
@@ -75,8 +89,8 @@ export default function Dashboard() {
               <p className="text-sm font-medium text-muted-foreground">Predicted Yield</p>
               <TrendingUp className="h-4 w-4 text-primary" />
             </div>
-            <div className="text-2xl font-bold">4.2 Tons/ha</div>
-            <p className="text-xs text-primary font-medium mt-1">+12% from last season</p>
+            <div className="text-2xl font-bold">{farmData ? "4.2 Tons/ha" : "--"}</div>
+            <p className="text-xs text-primary font-medium mt-1">{farmData ? "+12% from last season" : "No data available"}</p>
           </CardContent>
         </Card>
         <Card>
@@ -85,8 +99,8 @@ export default function Dashboard() {
               <p className="text-sm font-medium text-muted-foreground">Water Needs</p>
               <Droplets className="h-4 w-4 text-blue-500" />
             </div>
-            <div className="text-2xl font-bold">Low</div>
-            <p className="text-xs text-muted-foreground mt-1">Next irrigation in 2 days</p>
+            <div className="text-2xl font-bold">{farmData ? "Low" : "--"}</div>
+            <p className="text-xs text-muted-foreground mt-1">{farmData ? "Next irrigation in 2 days" : "Configure farm details"}</p>
           </CardContent>
         </Card>
         <Card>
@@ -95,8 +109,8 @@ export default function Dashboard() {
               <p className="text-sm font-medium text-muted-foreground">Soil Health</p>
               <CheckCircle2 className="h-4 w-4 text-accent" />
             </div>
-            <div className="text-2xl font-bold">Optimal</div>
-            <p className="text-xs text-muted-foreground mt-1">N: 85 | P: 42 | K: 60</p>
+            <div className="text-2xl font-bold">{farmData?.soilType ? farmData.soilType : "--"}</div>
+            <p className="text-xs text-muted-foreground mt-1">{farmData ? "Optimal conditions" : "Sample not taken"}</p>
           </CardContent>
         </Card>
         <Card className="bg-destructive/5 border-destructive/20">
@@ -105,8 +119,8 @@ export default function Dashboard() {
               <p className="text-sm font-medium text-muted-foreground">Risk Level</p>
               <AlertTriangle className="h-4 w-4 text-destructive" />
             </div>
-            <div className="text-2xl font-bold">Moderate</div>
-            <p className="text-xs text-destructive font-medium mt-1">Heat wave expected</p>
+            <div className="text-2xl font-bold">{farmData ? "Moderate" : "--"}</div>
+            <p className="text-xs text-destructive font-medium mt-1">{farmData ? "Heat wave expected" : "Waiting for location"}</p>
           </CardContent>
         </Card>
       </div>

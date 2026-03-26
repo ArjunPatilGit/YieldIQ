@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Sprout, Database, Save, Loader2, AlertCircle } from "lucide-react";
+import { MapPin, Sprout, Database, Save, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -66,14 +66,14 @@ export default function FarmProfilePage() {
       
       toast({
         title: "Profile Saved",
-        description: "Your farm details have been updated successfully.",
+        description: "Your farm details have been updated successfully in the cloud.",
       });
     } catch (error: any) {
-      console.error(error);
+      console.error("Save Error:", error);
       toast({
         variant: "destructive",
         title: "Database Error",
-        description: error.message || "Insufficient permissions to write to database.",
+        description: error.message || "Insufficient permissions to write to database. Ensure email is verified.",
       });
     } finally {
       setIsSaving(false);
@@ -84,24 +84,34 @@ export default function FarmProfilePage() {
     return (
       <div className="flex flex-col items-center justify-center h-64 space-y-4">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground">Retrieving farm profile...</p>
+        <p className="text-sm text-muted-foreground">Retrieving secure farm records...</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
-      <div>
-        <h1 className="text-2xl font-bold font-headline">Farm Profile</h1>
-        <p className="text-muted-foreground">Manage your essential farm data for accurate AI predictions.</p>
+      <div className="flex justify-between items-end">
+        <div>
+          <h1 className="text-2xl font-bold font-headline">Farm Profile</h1>
+          <p className="text-muted-foreground">Manage your essential farm data for accurate AI predictions.</p>
+        </div>
+        <div className="hidden sm:flex items-center gap-2 text-[10px] bg-muted px-2 py-1 rounded border">
+          <Database className="h-3 w-3" />
+          <span>Cloud Sync Active</span>
+        </div>
       </div>
 
       {farmError && (
-        <Alert variant="destructive">
+        <Alert variant="destructive" className="bg-destructive/5">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Permission Denied</AlertTitle>
-          <AlertDescription>
-            You do not have permission to access farm records. Please ensure your email is verified and try again.
+          <AlertTitle>Cloud Synchronization Issue</AlertTitle>
+          <AlertDescription className="space-y-3">
+            <p>We encountered a permission error accessing your farm records. This usually happens if your email isn't verified or if there's a connectivity issue.</p>
+            <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="h-8">
+              <RefreshCw className="mr-2 h-3 w-3" />
+              Retry Connection
+            </Button>
           </AlertDescription>
         </Alert>
       )}
@@ -109,11 +119,11 @@ export default function FarmProfilePage() {
       <div className="grid gap-6">
         <Card className="border-primary/10">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
               <Database className="h-5 w-5 text-primary" />
               General Information
             </CardTitle>
-            <CardDescription>Basic details about your farming operation.</CardDescription>
+            <CardDescription>Basic details about your farming operation stored in your private cluster.</CardDescription>
           </CardHeader>
           <CardContent className="grid md:grid-cols-2 gap-6">
             <div className="space-y-2">
@@ -171,11 +181,11 @@ export default function FarmProfilePage() {
 
         <Card className="border-primary/10">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
               <Sprout className="h-5 w-5 text-primary" />
               Current Crop Cycle
             </CardTitle>
-            <CardDescription>Details of the crops currently in the field.</CardDescription>
+            <CardDescription>Details of the crops currently in the field for AI yield estimation.</CardDescription>
           </CardHeader>
           <CardContent className="grid md:grid-cols-2 gap-6">
             <div className="space-y-2">
@@ -237,9 +247,9 @@ export default function FarmProfilePage() {
 
         <div className="flex justify-end gap-4">
           <Button variant="outline" onClick={() => window.location.reload()}>Discard Changes</Button>
-          <Button className="bg-primary hover:bg-primary/90" onClick={handleSave} disabled={isSaving || !!farmError}>
+          <Button className="bg-primary hover:bg-primary/90 min-w-[140px]" onClick={handleSave} disabled={isSaving}>
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-            Save Profile
+            Save to Cloud
           </Button>
         </div>
       </div>
