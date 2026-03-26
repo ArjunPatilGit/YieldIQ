@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -12,7 +11,9 @@ import {
   Map as MapIcon, 
   Bell, 
   FileText,
-  Database
+  Database,
+  FileUp,
+  Activity
 } from "lucide-react";
 
 const items = [
@@ -25,6 +26,11 @@ const items = [
     title: "Farm Profile",
     href: "/dashboard/farm-profile",
     icon: UserCircle,
+  },
+  {
+    title: "Upload Lab Report",
+    href: "/dashboard/report-upload",
+    icon: FileUp,
   },
   {
     title: "Advisory Reports",
@@ -42,14 +48,14 @@ const items = [
     icon: MapIcon,
   },
   {
+    title: "Data Pipeline",
+    href: "/dashboard/data-pipeline",
+    icon: Activity,
+  },
+  {
     title: "Database Explorer",
     href: "/dashboard/explorer",
     icon: Database,
-  },
-  {
-    title: "Alerts",
-    href: "/dashboard/alerts",
-    icon: Bell,
   },
 ];
 

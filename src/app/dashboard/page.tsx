@@ -12,22 +12,18 @@ import {
   Calendar,
   ArrowRight,
   Loader2,
-  Info
+  Info,
+  FileUp,
+  FlaskConical
 } from "lucide-react";
 import Link from "next/link";
 import { YieldOverviewChart } from "@/components/dashboard/yield-overview-chart";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 
 export default function Dashboard() {
   const { user } = useUser();
   const db = useFirestore();
-
-  const userProfileRef = useMemoFirebase(() => {
-    if (!db || !user) return null;
-    return doc(db, "users", user.uid);
-  }, [db, user]);
-
-  const { data: profileData, isLoading: isProfileLoading } = useDoc(userProfileRef);
 
   const farmRef = useMemoFirebase(() => {
     if (!db || !user) return null;
@@ -42,7 +38,7 @@ export default function Dashboard() {
     year: 'numeric' 
   });
 
-  if (isProfileLoading) {
+  if (isFarmLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -50,16 +46,19 @@ export default function Dashboard() {
     );
   }
 
+  const hasInsights = !!farmData?.lastComputedInsights;
+  const advisory = farmData?.latestAdvisory;
+  const insights = farmData?.lastComputedInsights;
+
   return (
     <div className="space-y-6">
-      {/* Welcome Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold font-headline">
-            Welcome back, {profileData?.firstName || user?.displayName?.split(' ')[0] || "Farmer"}
+            Welcome back, {user?.displayName?.split(' ')[0] || "Farmer"}
           </h1>
           <p className="text-muted-foreground">
-            {farmData?.name ? `Overview of ${farmData.name}` : "Here is what's happening on your farm today."}
+            {farmData?.name ? `YieldIQ Precision Insights for ${farmData.name}` : "Connect your data for AI-driven precision agriculture."}
           </p>
         </div>
         <div className="flex items-center gap-2 bg-secondary/50 px-4 py-2 rounded-lg border border-primary/10">
@@ -68,127 +67,142 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {!farmData && !isFarmLoading && (
-        <Alert className="bg-accent/5 border-accent/20">
-          <Info className="h-4 w-4 text-accent" />
-          <AlertTitle>Setup Required</AlertTitle>
-          <AlertDescription className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <span>You haven't initialized your farm profile yet. Complete your profile to see AI-driven insights.</span>
-            <Button size="sm" asChild>
-              <Link href="/dashboard/farm-profile">Complete Profile</Link>
-            </Button>
-          </AlertDescription>
+      {!hasInsights && (
+        <Alert className="bg-primary/5 border-primary/20 p-6">
+          <FlaskConical className="h-6 w-6 text-primary" />
+          <div className="ml-4 flex-1">
+            <AlertTitle className="text-lg font-bold">Science-Driven Insights Waiting</AlertTitle>
+            <AlertDescription className="mt-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+              <span className="max-w-xl text-muted-foreground">
+                Upload your latest water or soil lab report (PDF/Image) to unlock precise yield predictions, 
+                irrigation schedules, and soil structural analysis tailored to your farm's chemistry.
+              </span>
+              <Button size="lg" className="shrink-0 gap-2" asChild>
+                <Link href="/dashboard/report-upload">
+                  <FileUp className="h-4 w-4" />
+                  Upload Lab Report
+                </Link>
+              </Button>
+            </AlertDescription>
+          </div>
         </Alert>
       )}
 
       {/* Quick Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-primary/5 border-primary/20">
+        <Card className={hasInsights ? "bg-primary/5 border-primary/20 shadow-sm" : "opacity-60"}>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium text-muted-foreground">Predicted Yield</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Predicted Yield</p>
               <TrendingUp className="h-4 w-4 text-primary" />
             </div>
-            <div className="text-2xl font-bold">{farmData ? "4.2 Tons/ha" : "--"}</div>
-            <p className="text-xs text-primary font-medium mt-1">{farmData ? "+12% from last season" : "No data available"}</p>
+            <div className="text-3xl font-bold">{advisory?.predictedYieldSummary?.display || "--"}</div>
+            <div className="flex items-center gap-1.5 mt-1">
+               <Badge variant="outline" className="text-[10px] bg-background">
+                 {advisory?.predictedYieldSummary?.subtitle || "Awaiting Data"}
+               </Badge>
+            </div>
           </CardContent>
         </Card>
-        <Card>
+
+        <Card className={hasInsights ? "shadow-sm" : "opacity-60"}>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium text-muted-foreground">Water Needs</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Water Needs</p>
               <Droplets className="h-4 w-4 text-blue-500" />
             </div>
-            <div className="text-2xl font-bold">{farmData ? "Low" : "--"}</div>
-            <p className="text-xs text-muted-foreground mt-1">{farmData ? "Next irrigation in 2 days" : "Configure farm details"}</p>
+            <div className="text-3xl font-bold">{advisory?.waterNeedsSummary?.level || "--"}</div>
+            <p className="text-xs text-muted-foreground mt-1 font-medium">{advisory?.waterNeedsSummary?.nextIrrigationText || "Configure Irrigation"}</p>
           </CardContent>
         </Card>
-        <Card>
+
+        <Card className={hasInsights ? "shadow-sm" : "opacity-60"}>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium text-muted-foreground">Soil Health</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Soil Health</p>
               <CheckCircle2 className="h-4 w-4 text-accent" />
             </div>
-            <div className="text-2xl font-bold">{farmData?.soilType ? farmData.soilType : "--"}</div>
-            <p className="text-xs text-muted-foreground mt-1">{farmData ? "Optimal conditions" : "Sample not taken"}</p>
+            <div className="text-3xl font-bold">{advisory?.soilHealthSummary?.score ? `${advisory.soilHealthSummary.score}/10` : "--"}</div>
+            <p className="text-xs text-muted-foreground mt-1 font-medium">{advisory?.soilHealthSummary?.label || "No Lab Data"}</p>
           </CardContent>
         </Card>
-        <Card className="bg-destructive/5 border-destructive/20">
+
+        <Card className={advisory?.riskSummary?.level === 'High' ? "bg-destructive/5 border-destructive/20" : "shadow-sm"}>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium text-muted-foreground">Risk Level</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Risk Level</p>
               <AlertTriangle className="h-4 w-4 text-destructive" />
             </div>
-            <div className="text-2xl font-bold">{farmData ? "Moderate" : "--"}</div>
-            <p className="text-xs text-destructive font-medium mt-1">{farmData ? "Heat wave expected" : "Waiting for location"}</p>
+            <div className="text-3xl font-bold">{advisory?.riskSummary?.level || "--"}</div>
+            <p className="text-xs text-destructive font-medium mt-1 truncate">{advisory?.riskSummary?.primaryRisk || "Monitoring Weather"}</p>
           </CardContent>
         </Card>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Main Chart */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="font-headline">Yield History & Projection</CardTitle>
-            <CardDescription>Comparison of historical yields vs AI-driven projections.</CardDescription>
+        <Card className="lg:col-span-2 shadow-md">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="font-headline">Yield & Salinity Model</CardTitle>
+              <CardDescription>Scientific projection based on Maas-Hoffman thresholds.</CardDescription>
+            </div>
+            {hasInsights && (
+               <div className="text-right">
+                 <div className="text-xs text-muted-foreground">Confidence</div>
+                 <Badge variant="secondary">{insights?.yieldConfidence}</Badge>
+               </div>
+            )}
           </CardHeader>
           <CardContent>
             <YieldOverviewChart />
           </CardContent>
         </Card>
 
-        {/* Actionable Tasks */}
-        <Card>
+        {/* Smart Tasks */}
+        <Card className="shadow-md">
           <CardHeader>
-            <CardTitle className="font-headline">Smart Tasks</CardTitle>
-            <CardDescription>Priority actions based on AI analysis.</CardDescription>
+            <CardTitle className="font-headline flex items-center gap-2">
+               Smart Tasks
+               {hasInsights && <Badge className="ml-2">{advisory?.smartTasks?.length}</Badge>}
+            </CardTitle>
+            <CardDescription>Actions derived from your specific farm chemistry.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {[
-              { title: "Apply Nitrogen Fertilizer", status: "High Priority", icon: SproutIcon },
-              { title: "Schedule Drip Irrigation", status: "Medium Priority", icon: Droplets },
-              { title: "Inspect Zone 4 for Pests", status: "Observation", icon: AlertTriangle }
-            ].map((task, i) => (
-              <div key={i} className="flex items-start gap-3 p-3 rounded-lg border bg-background hover:border-primary/50 transition-colors">
-                <div className="h-8 w-8 rounded bg-secondary flex items-center justify-center shrink-0">
-                  <task.icon className="h-4 w-4 text-primary" />
+            {hasInsights ? (
+              advisory?.smartTasks?.map((task: any, i: number) => (
+                <div key={i} className="flex items-start gap-3 p-3 rounded-lg border bg-background hover:border-primary/50 transition-colors group">
+                  <div className={`h-8 w-8 rounded flex items-center justify-center shrink-0 ${
+                    task.priority === 'High' ? 'bg-destructive/10 text-destructive' : 'bg-secondary text-primary'
+                  }`}>
+                    <CheckCircle2 className="h-4 w-4" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold">{task.title}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground">{task.category}</span>
+                      <span className="text-[10px] text-muted-foreground">•</span>
+                      <span className="text-[10px] text-muted-foreground">Due in {task.dueInDays}d</span>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">{task.title}</p>
-                  <p className="text-xs text-muted-foreground">{task.status}</p>
-                </div>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
+              ))
+            ) : (
+              <div className="text-center py-12">
+                 <Info className="h-10 w-10 text-muted mx-auto mb-4" />
+                 <p className="text-sm text-muted-foreground">Upload a lab report to generate smart tasks.</p>
               </div>
-            ))}
+            )}
+            
             <Button variant="outline" className="w-full mt-4" asChild>
-              <Link href="/dashboard/advisory">View Full Advisory</Link>
+              <Link href="/dashboard/advisory">View Detailed Science Report</Link>
             </Button>
           </CardContent>
         </Card>
       </div>
     </div>
   );
-}
-
-function SproutIcon(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M7 20h10" />
-      <path d="M10 20c5.5-3 5.5-13 0-16" />
-      <path d="M14 20c-5.5-3-5.5-13 0-16" />
-    </svg>
-  )
 }
