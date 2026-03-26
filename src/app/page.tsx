@@ -23,10 +23,10 @@ export default function Home() {
           </nav>
           <div className="flex items-center gap-4">
             <Button variant="ghost" asChild>
-              <Link href="/dashboard">Login</Link>
+              <Link href="/login">Login</Link>
             </Button>
             <Button asChild>
-              <Link href="/dashboard">Get Started</Link>
+              <Link href="/signup">Get Started</Link>
             </Button>
           </div>
         </div>
@@ -50,7 +50,7 @@ export default function Home() {
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 pt-4">
                   <Button size="lg" className="h-12 px-8 text-lg" asChild>
-                    <Link href="/dashboard">Start Free Trial</Link>
+                    <Link href="/signup">Start Free Trial</Link>
                   </Button>
                   <Button size="lg" variant="outline" className="h-12 px-8 text-lg">
                     Watch Demo
