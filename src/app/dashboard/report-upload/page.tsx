@@ -14,7 +14,8 @@ import {
   Zap, 
   FlaskConical,
   Beaker,
-  Database
+  Database,
+  Droplets
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
@@ -39,7 +40,6 @@ export default function ReportUploadPage() {
     setStep("Reading report...");
 
     try {
-      // Convert to base64
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = async () => {
@@ -48,7 +48,7 @@ export default function ReportUploadPage() {
         setProgress(30);
         setStep("Extracting lab parameters with Gemini...");
         
-        const result = await generateInsights(user.uid, base64);
+        await generateInsights(user.uid, base64);
         
         setProgress(70);
         setStep("Running agronomy models...");
@@ -77,7 +77,7 @@ export default function ReportUploadPage() {
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       <div>
-        <h1 className="text-3xl font-bold font-headline">Lab Report Analysis</h1>
+        <h1 className="text-3xl font-bold font-headline text-foreground">Lab Report Analysis</h1>
         <p className="text-muted-foreground">Upload your water or soil report to derive scientific farm intelligence.</p>
       </div>
 

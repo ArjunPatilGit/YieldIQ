@@ -14,7 +14,9 @@ import {
   Loader2,
   Info,
   FileUp,
-  FlaskConical
+  FlaskConical,
+  Sun,
+  CloudRain
 } from "lucide-react";
 import Link from "next/link";
 import { YieldOverviewChart } from "@/components/dashboard/yield-overview-chart";
@@ -54,16 +56,22 @@ export default function Dashboard() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold font-headline">
+          <h1 className="text-3xl font-bold font-headline text-foreground">
             Welcome back, {user?.displayName?.split(' ')[0] || "Farmer"}
           </h1>
           <p className="text-muted-foreground">
-            {farmData?.name ? `YieldIQ Precision Insights for ${farmData.name}` : "Connect your data for AI-driven precision agriculture."}
+            {farmData?.name ? `Farm: ${farmData.name}` : "Connect your data for AI-driven farming advice."}
           </p>
         </div>
-        <div className="flex items-center gap-2 bg-secondary/50 px-4 py-2 rounded-lg border border-primary/10">
-          <Calendar className="h-4 w-4 text-primary" />
-          <span className="text-sm font-medium">{today}</span>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 bg-secondary/50 px-4 py-2 rounded-lg border border-primary/10">
+            <Sun className="h-4 w-4 text-orange-500" />
+            <span className="text-sm font-medium">32°C • Clear</span>
+          </div>
+          <div className="flex items-center gap-2 bg-secondary/50 px-4 py-2 rounded-lg border border-primary/10">
+            <Calendar className="h-4 w-4 text-primary" />
+            <span className="text-sm font-medium">{today}</span>
+          </div>
         </div>
       </div>
 
@@ -71,11 +79,10 @@ export default function Dashboard() {
         <Alert className="bg-primary/5 border-primary/20 p-6">
           <FlaskConical className="h-6 w-6 text-primary" />
           <div className="ml-4 flex-1">
-            <AlertTitle className="text-lg font-bold">Science-Driven Insights Waiting</AlertTitle>
+            <AlertTitle className="text-lg font-bold">Scientific Insights Ready for You</AlertTitle>
             <AlertDescription className="mt-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
               <span className="max-w-xl text-muted-foreground">
-                Upload your latest water or soil lab report (PDF/Image) to unlock precise yield predictions, 
-                irrigation schedules, and soil structural analysis tailored to your farm's chemistry.
+                Upload your water or soil lab report to see your predicted yield and irrigation schedule tailored to your land.
               </span>
               <Button size="lg" className="shrink-0 gap-2" asChild>
                 <Link href="/dashboard/report-upload">
@@ -88,20 +95,18 @@ export default function Dashboard() {
         </Alert>
       )}
 
-      {/* Quick Stats Grid */}
+      {/* Simplified Insights Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className={hasInsights ? "bg-primary/5 border-primary/20 shadow-sm" : "opacity-60"}>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Predicted Yield</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Yield Prediction</p>
               <TrendingUp className="h-4 w-4 text-primary" />
             </div>
             <div className="text-3xl font-bold">{advisory?.predictedYieldSummary?.display || "--"}</div>
-            <div className="flex items-center gap-1.5 mt-1">
-               <Badge variant="outline" className="text-[10px] bg-background">
-                 {advisory?.predictedYieldSummary?.subtitle || "Awaiting Data"}
-               </Badge>
-            </div>
+            <p className="text-[10px] text-muted-foreground mt-1 truncate">
+              {advisory?.predictedYieldSummary?.subtitle || "Awaiting lab report"}
+            </p>
           </CardContent>
         </Card>
 
@@ -112,7 +117,7 @@ export default function Dashboard() {
               <Droplets className="h-4 w-4 text-blue-500" />
             </div>
             <div className="text-3xl font-bold">{advisory?.waterNeedsSummary?.level || "--"}</div>
-            <p className="text-xs text-muted-foreground mt-1 font-medium">{advisory?.waterNeedsSummary?.nextIrrigationText || "Configure Irrigation"}</p>
+            <p className="text-xs text-muted-foreground mt-1 font-medium">{advisory?.waterNeedsSummary?.nextIrrigationText || "Waiting for data"}</p>
           </CardContent>
         </Card>
 
@@ -122,8 +127,8 @@ export default function Dashboard() {
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Soil Health</p>
               <CheckCircle2 className="h-4 w-4 text-accent" />
             </div>
-            <div className="text-3xl font-bold">{advisory?.soilHealthSummary?.score ? `${advisory.soilHealthSummary.score}/10` : "--"}</div>
-            <p className="text-xs text-muted-foreground mt-1 font-medium">{advisory?.soilHealthSummary?.label || "No Lab Data"}</p>
+            <div className="text-3xl font-bold">{advisory?.soilHealthSummary?.label || "--"}</div>
+            <p className="text-xs text-muted-foreground mt-1 font-medium">{advisory?.soilHealthSummary?.score ? `Score: ${advisory.soilHealthSummary.score}/10` : "No data"}</p>
           </CardContent>
         </Card>
 
@@ -134,7 +139,7 @@ export default function Dashboard() {
               <AlertTriangle className="h-4 w-4 text-destructive" />
             </div>
             <div className="text-3xl font-bold">{advisory?.riskSummary?.level || "--"}</div>
-            <p className="text-xs text-destructive font-medium mt-1 truncate">{advisory?.riskSummary?.primaryRisk || "Monitoring Weather"}</p>
+            <p className="text-xs text-muted-foreground mt-1 truncate">{advisory?.riskSummary?.primaryRisk || "Safe conditions"}</p>
           </CardContent>
         </Card>
       </div>
@@ -144,14 +149,13 @@ export default function Dashboard() {
         <Card className="lg:col-span-2 shadow-md">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="font-headline">Yield & Salinity Model</CardTitle>
-              <CardDescription>Scientific projection based on Maas-Hoffman thresholds.</CardDescription>
+              <CardTitle className="font-headline text-xl">Harvest Forecast</CardTitle>
+              <CardDescription>Comparison of your historical yield against AI predictions.</CardDescription>
             </div>
             {hasInsights && (
-               <div className="text-right">
-                 <div className="text-xs text-muted-foreground">Confidence</div>
-                 <Badge variant="secondary">{insights?.yieldConfidence}</Badge>
-               </div>
+               <Badge variant="secondary" className="bg-primary/10 text-primary border-none">
+                 Science Verified
+               </Badge>
             )}
           </CardHeader>
           <CardContent>
@@ -159,14 +163,14 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Smart Tasks */}
+        {/* Action Items */}
         <Card className="shadow-md">
           <CardHeader>
             <CardTitle className="font-headline flex items-center gap-2">
                Smart Tasks
-               {hasInsights && <Badge className="ml-2">{advisory?.smartTasks?.length}</Badge>}
+               {hasInsights && <Badge className="ml-2 bg-primary">{advisory?.smartTasks?.length}</Badge>}
             </CardTitle>
-            <CardDescription>Actions derived from your specific farm chemistry.</CardDescription>
+            <CardDescription>Actions to take right now for better growth.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {hasInsights ? (
@@ -179,11 +183,7 @@ export default function Dashboard() {
                   </div>
                   <div className="flex-1">
                     <p className="text-sm font-semibold">{task.title}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-[10px] uppercase font-bold text-muted-foreground">{task.category}</span>
-                      <span className="text-[10px] text-muted-foreground">•</span>
-                      <span className="text-[10px] text-muted-foreground">Due in {task.dueInDays}d</span>
-                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Priority: {task.priority}</p>
                   </div>
                   <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
                     <ArrowRight className="h-4 w-4" />
@@ -193,12 +193,12 @@ export default function Dashboard() {
             ) : (
               <div className="text-center py-12">
                  <Info className="h-10 w-10 text-muted mx-auto mb-4" />
-                 <p className="text-sm text-muted-foreground">Upload a lab report to generate smart tasks.</p>
+                 <p className="text-sm text-muted-foreground">Upload a lab report to see your tasks.</p>
               </div>
             )}
             
-            <Button variant="outline" className="w-full mt-4" asChild>
-              <Link href="/dashboard/advisory">View Detailed Science Report</Link>
+            <Button className="w-full mt-4" asChild>
+              <Link href="/dashboard/advisory">Read Full Advice Report</Link>
             </Button>
           </CardContent>
         </Card>
