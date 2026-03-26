@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -9,8 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Sprout, Database, Save, Loader2 } from "lucide-react";
+import { MapPin, Sprout, Database, Save, Loader2, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function FarmProfilePage() {
   const { user } = useUser();
@@ -19,11 +19,10 @@ export default function FarmProfilePage() {
   
   const farmRef = useMemoFirebase(() => {
     if (!db || !user) return null;
-    // For MVP, we'll assume the user has one primary farm document with ID 'primary'
     return doc(db, "users", user.uid, "farms", "primary");
   }, [db, user]);
 
-  const { data: farmData, isLoading: isFarmLoading } = useDoc(farmRef);
+  const { data: farmData, isLoading: isFarmLoading, error: farmError } = useDoc(farmRef);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -54,13 +53,13 @@ export default function FarmProfilePage() {
   }, [farmData]);
 
   const handleSave = async () => {
-    if (!farmRef) return;
+    if (!farmRef || !user) return;
     setIsSaving(true);
     try {
       await setDoc(farmRef, {
         ...formData,
         id: "primary",
-        ownerId: user?.uid,
+        ownerId: user.uid,
         updatedAt: serverTimestamp(),
         createdAt: farmData?.createdAt || serverTimestamp()
       }, { merge: true });
@@ -70,10 +69,11 @@ export default function FarmProfilePage() {
         description: "Your farm details have been updated successfully.",
       });
     } catch (error: any) {
+      console.error(error);
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "Failed to save farm profile.",
+        title: "Database Error",
+        description: error.message || "Insufficient permissions to write to database.",
       });
     } finally {
       setIsSaving(false);
@@ -82,8 +82,9 @@ export default function FarmProfilePage() {
 
   if (isFarmLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex flex-col items-center justify-center h-64 space-y-4">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">Retrieving farm profile...</p>
       </div>
     );
   }
@@ -95,8 +96,18 @@ export default function FarmProfilePage() {
         <p className="text-muted-foreground">Manage your essential farm data for accurate AI predictions.</p>
       </div>
 
+      {farmError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Permission Denied</AlertTitle>
+          <AlertDescription>
+            You do not have permission to access farm records. Please ensure your email is verified and try again.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="grid gap-6">
-        <Card>
+        <Card className="border-primary/10">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Database className="h-5 w-5 text-primary" />
@@ -158,7 +169,7 @@ export default function FarmProfilePage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-primary/10">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Sprout className="h-5 w-5 text-primary" />
@@ -226,7 +237,7 @@ export default function FarmProfilePage() {
 
         <div className="flex justify-end gap-4">
           <Button variant="outline" onClick={() => window.location.reload()}>Discard Changes</Button>
-          <Button className="bg-primary hover:bg-primary/90" onClick={handleSave} disabled={isSaving}>
+          <Button className="bg-primary hover:bg-primary/90" onClick={handleSave} disabled={isSaving || !!farmError}>
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
             Save Profile
           </Button>

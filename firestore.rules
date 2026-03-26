@@ -6,146 +6,44 @@ service cloud.firestore {
      * YieldIQ Security Rules
      * 
      * Philosophy:
-     * This ruleset enforces a strict user-ownership model. 
-     * - Users can manage their own UserProfile immediately upon signup (to allow profile creation).
-     * - Sensitive farm data and AI features require a verified email address.
+     * - Users have absolute ownership over their own data hierarchy.
+     * - Root user profile is accessible immediately to allow signup flows.
+     * - All nested agricultural and AI data requires a verified email address.
      */
 
-    // --- Helper Functions ---
-
-    /** @description Checks if the user is authenticated. */
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    /** @description Checks if the user has a verified email address. */
-    function isEmailVerified() {
-      return request.auth.token.email_verified == true;
-    }
-
-    /** @description Checks if the authenticated user's UID matches the provided userId. */
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    /** @description Combined check for a valid, verified active user. */
-    function isVerifiedUser() {
-      return isSignedIn() && isEmailVerified();
-    }
-
-    /** @description Checks if the user is the owner and the document exists. */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
-
-    /** @description Validates that a field is not being changed during an update. */
-    function isUnchanged(fieldName) {
-      return request.resource.data[fieldName] == resource.data[fieldName];
-    }
-
-    // --- Collection Rules ---
-
-    /**
-     * @description Rules for the UserProfile entity. 
-     * Users can manage their own profile regardless of verification status
-     * to ensure signup and verification flows work correctly.
-     */
+    // --- Core User Data ---
     match /users/{userId} {
-      allow get, list, create, update, delete: if isOwner(userId);
+      // Allow the owner to manage their root profile (required for signup and verification)
+      allow read, write: if request.auth != null && request.auth.uid == userId;
 
-      /**
-       * @description Rules for Farms. Requires email verification for access.
-       */
-      match /farms/{farmId} {
-        allow get, list: if isOwner(userId) && isEmailVerified();
-        allow create: if isOwner(userId) && isEmailVerified() && request.resource.data.ownerId == userId;
-        allow update, delete: if isOwner(userId) && isEmailVerified();
-
-        /**
-         * @description Rules for Fields and nested cycles.
-         */
-        match /fields/{fieldId} {
-          allow get, list, create, update, delete: if isOwner(userId) && isEmailVerified();
-
-          match /planting_cycles/{plantingCycleId} {
-            allow get, list, create, update, delete: if isOwner(userId) && isEmailVerified();
-
-            match /recommendations/{recommendationId} {
-              allow get, list, create, update, delete: if isOwner(userId) && isEmailVerified();
-            }
-
-            match /action_logs/{actionLogId} {
-              allow get, list, create, update, delete: if isOwner(userId) && isEmailVerified();
-            }
-
-            match /advisory_reports/{advisoryReportId} {
-              allow get, list, create, update, delete: if isOwner(userId) && isEmailVerified();
-            }
-          }
-
-          match /weather_data_points/{weatherDataPointId} {
-            allow get, list, create, update, delete: if isOwner(userId) && isEmailVerified();
-          }
-
-          match /soil_samples/{soilSampleId} {
-            allow get, list, create, update, delete: if isOwner(userId) && isEmailVerified();
-          }
-
-          match /satellite_imagery_analysis/{analysisId} {
-            allow get, list, create, update, delete: if isOwner(userId) && isEmailVerified();
-          }
-        }
-      }
-
-      /**
-       * @description Rules for User Notifications.
-       */
-      match /notifications/{notificationId} {
-        allow get, list, create, update, delete: if isOwner(userId) && isEmailVerified();
-      }
-
-      /**
-       * @description Rules for Conversation Logs.
-       */
-      match /conversation_logs/{logId} {
-        allow get, list, create, update, delete: if isOwner(userId) && isEmailVerified();
-      }
-
-      /**
-       * @description Rules for Consultation Requests.
-       */
-      match /consultation_requests/{requestId} {
-        allow get, list, create, update, delete: if isOwner(userId) && isEmailVerified();
-
-        match /sessions/{sessionId} {
-          allow get, list, create, update, delete: if isOwner(userId) && isEmailVerified();
-        }
+      // Secure all nested collections (farms, fields, logs, etc.)
+      // These REQUIRE the owner's email to be verified.
+      match /{allSubcollections=**} {
+        allow read, write: if request.auth != null 
+          && request.auth.uid == userId 
+          && request.auth.token.email_verified == true;
       }
     }
 
-    /**
-     * @description Global catalogs. Public read for verified users.
-     */
-    match /crop_types/{cropTypeId} {
-      allow get, list: if isVerifiedUser();
+    // --- Global Reference Data ---
+    // Accessible by any verified user
+    match /crop_types/{id} {
+      allow read: if request.auth != null && request.auth.token.email_verified == true;
+    }
+    
+    match /seasons/{id} {
+      allow read: if request.auth != null && request.auth.token.email_verified == true;
+    }
+    
+    match /consultant_profiles/{id} {
+      allow read: if request.auth != null && request.auth.token.email_verified == true;
     }
 
-    match /seasons/{seasonId} {
-      allow get, list: if isVerifiedUser();
-    }
-
-    match /consultant_profiles/{consultantId} {
-      allow get, list: if isVerifiedUser();
-    }
-
-    // --- Collection Group Rules ---
-
-    match /{path=**}/consultation_requests/{requestId} {
-      allow get, list: if isVerifiedUser() && resource.data.consultantId == request.auth.uid;
-    }
-
-    match /{path=**}/sessions/{sessionId} {
-      allow get, list: if isVerifiedUser() && resource.data.consultantId == request.auth.uid;
+    // --- Collection Groups ---
+    // Allows consultants to see requests assigned specifically to them
+    match /{path=**}/consultation_requests/{id} {
+      allow read: if request.auth != null 
+        && resource.data.consultantId == request.auth.uid;
     }
   }
 }
