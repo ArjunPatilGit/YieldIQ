@@ -1,29 +1,69 @@
+
+"use client";
+
+import { useUser, useFirestore, useDoc, useMemoFirebase } from "@/firebase";
+import { doc } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
   TrendingUp, 
   Droplets, 
-  Wind, 
-  AlertTriangle, 
   CheckCircle2, 
+  AlertTriangle, 
   Calendar,
-  ArrowRight
+  ArrowRight,
+  Loader2
 } from "lucide-react";
 import Link from "next/link";
 import { YieldOverviewChart } from "@/components/dashboard/yield-overview-chart";
 
 export default function Dashboard() {
+  const { user } = useUser();
+  const db = useFirestore();
+
+  const userProfileRef = useMemoFirebase(() => {
+    if (!db || !user) return null;
+    return doc(db, "users", user.uid);
+  }, [db, user]);
+
+  const { data: profileData, isLoading: isProfileLoading } = useDoc(userProfileRef);
+
+  const farmRef = useMemoFirebase(() => {
+    if (!db || !user) return null;
+    return doc(db, "users", user.uid, "farms", "primary");
+  }, [db, user]);
+
+  const { data: farmData } = useDoc(farmRef);
+
+  const today = new Date().toLocaleDateString('en-US', { 
+    month: 'long', 
+    day: 'numeric', 
+    year: 'numeric' 
+  });
+
+  if (isProfileLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Welcome Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold font-headline">Welcome back, Anil</h1>
-          <p className="text-muted-foreground">Here is what's happening on your farm today.</p>
+          <h1 className="text-3xl font-bold font-headline">
+            Welcome back, {profileData?.firstName || user?.displayName?.split(' ')[0] || "Farmer"}
+          </h1>
+          <p className="text-muted-foreground">
+            {farmData?.name ? `Overview of ${farmData.name}` : "Here is what's happening on your farm today."}
+          </p>
         </div>
         <div className="flex items-center gap-2 bg-secondary/50 px-4 py-2 rounded-lg border border-primary/10">
           <Calendar className="h-4 w-4 text-primary" />
-          <span className="text-sm font-medium">May 12, 2024</span>
+          <span className="text-sm font-medium">{today}</span>
         </div>
       </div>
 
@@ -76,7 +116,7 @@ export default function Dashboard() {
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="font-headline">Yield History & Projection</CardTitle>
-            <CardDescription>Comparison of historical yields vs AI-driven projections for Wheat.</CardDescription>
+            <CardDescription>Comparison of historical yields vs AI-driven projections.</CardDescription>
           </CardHeader>
           <CardContent>
             <YieldOverviewChart />

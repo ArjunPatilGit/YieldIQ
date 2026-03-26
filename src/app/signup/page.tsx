@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -33,7 +34,7 @@ export default function SignupPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Update basic profile
+      // Update basic profile in Auth
       await updateProfile(user, {
         displayName: `${firstName} ${lastName}`
       });
@@ -42,6 +43,7 @@ export default function SignupPage() {
       await sendEmailVerification(user);
 
       // Create UserProfile document in Firestore
+      // This allows admins to see user details (excluding passwords) in the Firebase Console
       await setDoc(doc(db, "users", user.uid), {
         id: user.uid,
         email: email,
@@ -59,10 +61,20 @@ export default function SignupPage() {
 
       router.push("/verify-email");
     } catch (error: any) {
+      let errorMessage = "Could not create account.";
+      
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = "This email is already registered. Please try signing in instead.";
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = "Password is too weak. Please use at least 6 characters.";
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = "Please enter a valid email address.";
+      }
+
       toast({
         variant: "destructive",
         title: "Signup Failed",
-        description: error.message || "Could not create account.",
+        description: errorMessage,
       });
     } finally {
       setIsLoading(false);
