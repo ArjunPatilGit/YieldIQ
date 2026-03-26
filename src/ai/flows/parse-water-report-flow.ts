@@ -1,3 +1,4 @@
+'use server';
 /**
  * @fileOverview Genkit flow for parsing agricultural lab reports (water/soil).
  */
@@ -41,6 +42,15 @@ export type WaterReport = z.infer<typeof WaterReportSchema>;
 const ParseWaterReportInputSchema = z.object({
   photoDataUri: z.string().describe("A photo of a lab report, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."),
 });
+
+export type ParseWaterReportInput = z.infer<typeof ParseWaterReportInputSchema>;
+
+/**
+ * Server action wrapper for the water report parsing flow.
+ */
+export async function parseWaterReport(input: ParseWaterReportInput): Promise<WaterReport> {
+  return parseWaterReportFlow(input);
+}
 
 export const parseWaterReportFlow = ai.defineFlow(
   {

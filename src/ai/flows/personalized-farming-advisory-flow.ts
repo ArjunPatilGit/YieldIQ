@@ -1,3 +1,4 @@
+'use server';
 /**
  * @fileOverview Advanced Genkit flow for generating scientifically-backed farming advisory.
  */
@@ -5,7 +6,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 
-const AdvisoryOutputSchema = z.object({
+export const AdvisoryOutputSchema = z.object({
   predictedYieldSummary: z.object({
     display: z.string(),
     changeText: z.string().optional(),
@@ -47,9 +48,11 @@ const AdvisoryOutputSchema = z.object({
     seasonalAlerts: z.string().optional(),
   }),
   language: z.string(),
+  disclaimer: z.string().default('YieldIQ provides data-driven suggestions based on IS-10500 standards. Always consult a local agricultural extension officer for critical decisions.'),
 });
 
 export type AdvisoryOutput = z.infer<typeof AdvisoryOutputSchema>;
+export type PersonalizedFarmingAdvisoryOutput = AdvisoryOutput;
 
 const AdvisoryInputSchema = z.object({
   farm: z.any(),
@@ -58,6 +61,15 @@ const AdvisoryInputSchema = z.object({
   waterReport: z.any().optional(),
   preferredLanguage: z.string().default('en'),
 });
+
+export type AdvisoryInput = z.infer<typeof AdvisoryInputSchema>;
+
+/**
+ * Server action wrapper for the farming advisory flow.
+ */
+export async function personalizedFarmingAdvisory(input: AdvisoryInput): Promise<AdvisoryOutput> {
+  return farmingAdvisoryFlow(input);
+}
 
 export const farmingAdvisoryFlow = ai.defineFlow(
   {
@@ -93,6 +105,6 @@ export const farmingAdvisoryFlow = ai.defineFlow(
     });
 
     if (!output) throw new Error("Failed to generate advisory.");
-    return output;
+    return output!;
   }
 );
