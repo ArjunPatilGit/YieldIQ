@@ -50,5 +50,10 @@ YieldIQ is a scientifically-backed precision agriculture platform designed to em
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
+## 🏆 Hackathon Note
+
+This project was built for my **first-ever hackathon!** 🚀
+YieldIQ represents my journey into precision agriculture and AI-driven sustainable farming. It was a challenging and rewarding experience to build a full-stack solution that addresses real-world agricultural problems.
+
 ---
-*Built for the Hackathon - Empowering Agriculture through AI.*
+*Built with ❤️ for the Hackathon - Empowering Agriculture through AI.*
