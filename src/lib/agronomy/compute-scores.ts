@@ -22,6 +22,7 @@ export interface AgronomyInput {
   soilType: string;               
   cropType: string;               
   growthStage: string;            
+  plantingDate?: string;          
   irrigationMethod: string;       
   farmSizeHa?: number;
   previousSeasonYield?: number;   
@@ -112,11 +113,12 @@ function toMeq(mg_L: number, molarMass: number): number {
 }
 
 export function computeAgronomyScores(input: AgronomyInput): ComputedInsights {
-  const ecw = input.conductivity_uScm ? input.conductivity_uScm / 1000 : (input.tds ? input.tds / 640 : 0.5);
+  // CRITICAL: Ensure analysis only proceeds if report data (EC/TDS) is present
+  const ecw = input.conductivity_uScm ? input.conductivity_uScm / 1000 : (input.tds ? input.tds / 640 : 0);
   const ece = ecw * 1.5;
 
-  const Ca_meq = toMeq(input.calcium ?? 10, MW.Ca);
-  const Mg_meq = toMeq(input.magnesium ?? 5, MW.Mg);
+  const Ca_meq = toMeq(input.calcium ?? 0, MW.Ca);
+  const Mg_meq = toMeq(input.magnesium ?? 0, MW.Mg);
   
   // Estimate Sodium from charge balance if missing
   let Na_mg = input.sodium;
@@ -126,13 +128,13 @@ export function computeAgronomyScores(input: AgronomyInput): ComputedInsights {
     const SO4_meq = toMeq(input.sulphate ?? 0, MW.SO4);
     const totalAnions = alk_meq + Cl_meq + SO4_meq;
     const Na_meq = Math.max(0, totalAnions - Ca_meq - Mg_meq);
-    Na_mg = Na_meq * MW.Na;
+    Na_mg = Na_meq * MW. Na;
   }
   const Na_meq = Na_mg / MW.Na;
 
-  const sar = Na_meq / Math.sqrt((Ca_meq + Mg_meq) / 2);
+  const sar = (Ca_meq + Mg_meq) > 0 ? Na_meq / Math.sqrt((Ca_meq + Mg_meq) / 2) : 0;
   
-  const pH = input.pH ?? 7.0;
+  const pH = input.pH ?? 0; // 0 indicates pending/missing
   const CO3_meq = pH > 8.3 ? ((input.totalAlkalinity ?? 0) / 100) : 0;
   const HCO3_meq = (input.totalAlkalinity ?? 0) / 50 - CO3_meq;
   const rsc = (CO3_meq + HCO3_meq) - (Ca_meq + Mg_meq);
@@ -144,18 +146,26 @@ export function computeAgronomyScores(input: AgronomyInput): ComputedInsights {
 
   // Irrigation water quality score (0-10)
   let wqScore = 0;
-  const ecScore = ecw <= 0.25 ? 10 : (ecw <= 0.75 ? 9 : (ecw <= 2.25 ? 7 : (ecw <= 4 ? 4 : 1)));
-  const sarScore = sar < 10 ? 10 : (sar < 18 ? 7 : (sar < 26 ? 4 : 1));
-  const rscScore = rsc < 0 ? 10 : (rsc < 1.25 ? 8 : (rsc < 2.5 ? 5 : 1));
-  const phScore = (pH >= 6.5 && pH <= 7.5) ? 10 : ((pH > 7.5 && pH <= 8.5) ? 7 : 4);
-  wqScore = (ecScore * 0.3) + (sarScore * 0.25) + (rscScore * 0.25) + (phScore * 0.2);
+  if (ecw > 0) {
+    const ecScore = ecw <= 0.25 ? 10 : (ecw <= 0.75 ? 9 : (ecw <= 2.25 ? 7 : (ecw <= 4 ? 4 : 1)));
+    const sarScore = sar < 10 ? 10 : (sar < 18 ? 7 : (sar < 26 ? 4 : 1));
+    const rscScore = rsc < 0 ? 10 : (rsc < 1.25 ? 8 : (rsc < 2.5 ? 5 : 1));
+    const phScore = (pH >= 6.5 && pH <= 7.5) ? 10 : ((pH > 7.5 && pH <= 8.5) ? 7 : 4);
+    wqScore = (ecScore * 0.3) + (sarScore * 0.25) + (rscScore * 0.25) + (phScore * 0.2);
+  }
 
   // Soil Health
-  let soilScore = basePotentialYield[input.soilType.toLowerCase()] ? 9 : 7;
-  if (Ca_meq / Mg_meq < 3) soilScore -= 0.5;
-  if (rsc > 0) soilScore -= Math.min(3, rsc * 1.5);
-  if (ece > 2) soilScore -= Math.min(4, (ece - 2) * 1.5);
-  soilScore = Math.max(0, Math.min(10, soilScore));
+  let soilScore = 0;
+  if (ecw > 0) {
+     soilScore = basePotentialYield[input.soilType.toLowerCase()] ? 9 : 7;
+     if (Ca_meq / Mg_meq < 3) soilScore -= 0.5;
+     if (rsc > 0) soilScore -= Math.min(3, rsc * 1.5);
+     if (ece > 2) soilScore -= Math.min(4, (ece - 2) * 1.5);
+     soilScore = Math.max(0, Math.min(10, soilScore));
+  }
+
+  const dsp = input.plantingDate ? Math.floor((new Date().getTime() - new Date(input.plantingDate).getTime()) / (1000 * 60 * 60 * 24)) : 0;
+  const dspFactor = dsp > 0 ? Math.min(1.2, 0.8 + (Math.sin(dsp / 50) * 0.2)) : 0;
 
   // Yield Prediction
   const baseYield = basePotentialYield[input.soilType.toLowerCase()]?.[cropKey] || 3.0;
@@ -169,26 +179,31 @@ export function computeAgronomyScores(input: AgronomyInput): ComputedInsights {
   const stageMod = input.growthStage === 'initial' ? 0.6 : (input.growthStage === 'mid' ? 0.85 : 0.95);
   const irrMod = input.irrigationMethod === 'drip' ? 1.0 : (input.irrigationMethod === 'rainfed' ? 0.85 : 0.92);
   
-  const predictedYield = baseYield * salinityMod * wqMod * weatherMod * stageMod * irrMod;
+  const predictedYield = (ecw > 0 && dsp > 0) ? (baseYield * salinityMod * wqMod * weatherMod * stageMod * irrMod * dspFactor) : 0;
 
   // Water Needs
   const kcData = cropKc[cropKey] || cropKc.default;
-  const kc = kcData[input.growthStage] || kcData.mid;
+  const kcBase = kcData[input.growthStage] || kcData.mid;
+  const kc = kcBase * (1 + (Math.cos(dsp / 30) * 0.1)); 
   const etc = (input.eto_mmPerDay ?? 5.0) * kc;
   const nir = Math.max(0, etc - (input.dailyRainfall_mm ?? 0) * 0.8);
   
   const rootDepth = cropRootDepthM[cropKey] || 0.7;
   const availableWater = 200 * rootDepth;
-  const daysToNext = Math.min(14, Math.floor((availableWater * 0.5) / Math.max(nir, 0.1)));
+  const daysToNext = (ecw > 0) ? Math.min(14, Math.floor((availableWater * 0.5) / Math.max(nir, 0.1))) : 0;
 
   // Risk Assessment
   const riskFactors = [];
-  if (ecw > 1.5) riskFactors.push("High salinity detected in source water");
-  if (input.forecastMaxTemp7day && input.forecastMaxTemp7day > 40) riskFactors.push("Extreme heat wave forecast");
-  if (sar > 9) riskFactors.push("Sodium hazard detected (SAR > 9)");
-  if (nir > 6) riskFactors.push("High crop water demand due to heat");
+  if (ecw > 0) {
+    if (ecw > 1.5) riskFactors.push("High salinity detected in source water");
+    if (input.forecastMaxTemp7day && input.forecastMaxTemp7day > 40) riskFactors.push("Extreme heat wave forecast");
+    if (sar > 9) riskFactors.push("Sodium hazard detected (SAR > 9)");
+    if (nir > 6) riskFactors.push("High crop water demand due to heat");
+  } else {
+    riskFactors.push("Pending Lab Report Analysis");
+  }
 
-  const riskLevel = riskFactors.length > 2 ? 'High' : (riskFactors.length > 0 ? 'Moderate' : 'Low');
+  const riskLevel = ecw > 0 ? (riskFactors.length > 2 ? 'High' : (riskFactors.length > 0 ? 'Moderate' : 'Low')) : 'Moderate';
 
   return {
     ecw_dSm: ecw,
@@ -206,11 +221,11 @@ export function computeAgronomyScores(input: AgronomyInput): ComputedInsights {
     yieldChangePercent: input.previousSeasonYield ? Math.round(((predictedYield - input.previousSeasonYield) / input.previousSeasonYield) * 100) : undefined,
     yieldConfidence: input.conductivity_uScm ? 'High' : 'Medium',
     etc_mmPerDay: Number(etc.toFixed(2)),
-    waterNeedsLevel: nir < 3 ? 'Low' : (nir < 6 ? 'Medium' : 'High'),
+    waterNeedsLevel: ecw > 0 ? (nir < 3 ? 'Low' : (nir < 6 ? 'Medium' : 'High')) : 'Medium',
     daysToNextIrrigation: daysToNext,
     recommendedIrrigationMethod: input.irrigationMethod === 'flood' ? 'Drip Irrigation recommended for salt management' : input.irrigationMethod,
     soilHealthScore: Number(soilScore.toFixed(1)),
-    soilHealthLabel: soilScore > 8 ? 'Excellent' : (soilScore > 6 ? 'Good' : 'Fair'),
+    soilHealthLabel: soilScore > 8 ? 'Excellent' : (soilScore > 6 ? 'Good' : (soilScore > 0 ? 'Fair' : 'Pending Upload')),
     riskLevel,
     primaryRisk: riskFactors[0] || "No major risks detected",
     riskFactors

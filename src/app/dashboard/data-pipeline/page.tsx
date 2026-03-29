@@ -19,6 +19,9 @@ import {
   Binary
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import dynamic from "next/dynamic";
+
+const Xarrow = dynamic(() => import("react-xarrows"), { ssr: false });
 
 interface Sensor {
   id: string;
@@ -68,9 +71,9 @@ export default function DataPipelinePage() {
 
       setStream(prev => [logEntry, ...prev].slice(0, 5));
       
-      // Reset crunching animation after 2s
-      setTimeout(() => setIsCrunching(false), 2000);
-    }, 5000);
+      // Reset crunching animation after 4s
+      setTimeout(() => setIsCrunching(false), 4000);
+    }, 10000);
 
     return () => clearInterval(interval);
   }, [sensors]);
@@ -126,7 +129,7 @@ export default function DataPipelinePage() {
 
       <div className="grid lg:grid-cols-3 gap-8">
         {/* Column 1: Raw Stream */}
-        <div className="space-y-4">
+        <div className="space-y-4" id="raw-stream">
           <div className="flex items-center gap-2 mb-2">
             <Database className="h-5 w-5 text-muted-foreground" />
             <h3 className="font-bold text-sm uppercase tracking-widest">Stage 1: Raw Stream</h3>
@@ -145,7 +148,7 @@ export default function DataPipelinePage() {
                         const sensor = sensors.find(s => s.id === id);
                         return (
                           <span key={id} className="text-xs font-bold">
-                            {sensor?.name.split(' ')[0]}: {val}{sensor?.unit}
+                            {sensor?.name.split(' ')[0]}: {String(val)}{sensor?.unit}
                           </span>
                         );
                       })}
@@ -167,7 +170,7 @@ export default function DataPipelinePage() {
             <Cpu className="h-5 w-5 text-primary" />
             <h3 className="font-bold text-sm uppercase tracking-widest text-primary">Stage 2: Crunching</h3>
           </div>
-          <div className="w-full bg-primary/5 border border-primary/20 rounded-xl p-6 space-y-6 relative overflow-hidden">
+          <div id="crunching-stage" className="w-full bg-primary/5 border border-primary/20 rounded-xl p-6 space-y-6 relative overflow-hidden">
              {isCrunching && (
                <div className="absolute top-0 left-0 w-full h-1 bg-accent animate-progress" />
              )}
@@ -198,18 +201,20 @@ export default function DataPipelinePage() {
           </div>
           
           <div className="flex flex-col items-center mt-4">
-            <div className="px-3 py-1 bg-accent/10 border border-accent/20 rounded text-[10px] font-mono text-accent-foreground mb-2">
-              PRE-AI ANALYSIS CONTEXT:
-            </div>
-            <div className="text-[10px] italic text-muted-foreground text-center max-w-[200px] mb-2">
-              "Assemble normalized stream from {sensors.filter(s => s.active).map(s => s.name.split(' ')[0]).join(', ')}..."
-            </div>
-            <ArrowRight className="h-8 w-8 text-primary rotate-90 lg:rotate-0" />
+            <ArrowRight className="h-4 w-4 text-primary rotate-90 lg:rotate-0 mb-4 opacity-50" />
           </div>
         </div>
 
         {/* Column 3: AI Ready Insights */}
-        <div className="space-y-4">
+        <div className="space-y-4" id="prediction-stage">
+          <div className="flex flex-col items-start mb-4">
+            <div className="px-3 py-1 bg-accent/10 border border-accent/20 rounded text-[10px] font-mono text-accent-foreground mb-2">
+              PRE-AI ANALYSIS CONTEXT:
+            </div>
+            <div className="text-[10px] italic text-muted-foreground max-w-[200px] mb-2">
+              "Assemble normalized stream from {sensors.filter(s => s.active).map(s => s.name.split(' ')[0]).join(', ')}..."
+            </div>
+          </div>
           <div className="flex items-center gap-2 mb-2">
             <Zap className="h-5 w-5 text-accent" />
             <h3 className="font-bold text-sm uppercase tracking-widest text-accent">Stage 3: Predictions</h3>
@@ -249,9 +254,27 @@ export default function DataPipelinePage() {
                  </div>
                </div>
              </CardContent>
-          </Card>
+           </Card>
         </div>
       </div>
+      
+      {/* Visual interconnect lines using Xarrow */}
+      <Xarrow 
+        start="raw-stream" 
+        end="crunching-stage" 
+        color="hsl(var(--primary))" 
+        strokeWidth={2} 
+        lineColor={isCrunching ? "hsl(var(--accent))" : "hsl(var(--primary) / 0.5)"}
+        dashness={isCrunching ? { animation: 1 } : false} 
+      />
+      <Xarrow 
+        start="crunching-stage" 
+        end="prediction-stage" 
+        color="hsl(var(--accent))" 
+        strokeWidth={2} 
+        lineColor={isCrunching ? "hsl(var(--accent))" : "hsl(var(--accent) / 0.5)"}
+        dashness={isCrunching ? { animation: 1 } : false} 
+      />
     </div>
   );
 }

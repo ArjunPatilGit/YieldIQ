@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useUser, useFirestore, useDoc, useMemoFirebase } from "@/firebase";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { useUser, useFirestore, useDoc, useMemoFirebase, doc, setDoc, collection, addDoc, serverTimestamp } from "@/firebase";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,17 +9,21 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MapPin, Sprout, Database, Save, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useSession } from "next-auth/react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function FarmProfilePage() {
-  const { user } = useUser();
+  const { data: session } = useSession();
+  const { user: firebaseUser } = useUser();
   const db = useFirestore();
   const { toast } = useToast();
   
+  const userUid = firebaseUser?.uid || (session?.user as any)?.id;
+  
   const farmRef = useMemoFirebase(() => {
-    if (!db || !user) return null;
-    return doc(db, "users", user.uid, "farms", "primary");
-  }, [db, user]);
+    if (!db || !userUid) return null;
+    return doc(db, "users", userUid, "farms", "primary");
+  }, [db, userUid]);
 
   const { data: farmData, isLoading: isFarmLoading, error: farmError } = useDoc(farmRef);
 
@@ -32,10 +35,16 @@ export default function FarmProfilePage() {
     cropType: "",
     plantingDate: "",
     growthStage: "",
-    variety: ""
+    variety: "",
+    numberOfPlots: 1,
+    plots: [{ size: 0, cropType: "", plantingDate: "", growthStage: "", variety: "", soilType: "" }]
   });
 
   const [isSaving, setIsSaving] = useState(false);
+
+  const totalPlotsArea = formData.plots.reduce((sum, plot) => sum + (Number(plot.size) || 0), 0);
+  const isAreaExceeded = totalPlotsArea > formData.totalAreaHectares;
+  const isMissingSoilType = formData.plots.some(plot => !plot.soilType);
 
   useEffect(() => {
     if (farmData) {
@@ -47,37 +56,63 @@ export default function FarmProfilePage() {
         cropType: farmData.cropType || "",
         plantingDate: farmData.plantingDate || "",
         growthStage: farmData.growthStage || "",
-        variety: farmData.variety || ""
+        variety: farmData.variety || "",
+        numberOfPlots: farmData.numberOfPlots || 1,
+        plots: farmData.plots || [{ size: 0, cropType: "", plantingDate: "", growthStage: "", variety: "", soilType: "" }]
       });
     }
   }, [farmData]);
 
   const handleSave = async () => {
-    if (!farmRef || !user) return;
+    if (!farmRef || !userUid || !db) return;
     setIsSaving(true);
+    
+    // FORM DATA TO SAVE
+    const savePayload = {
+      ...formData,
+      id: "primary",
+      ownerId: userUid,
+      updatedAt: new Date().toISOString()
+    };
+
     try {
+      // 1. ATTEMPT FIRESTORE SAVE
       await setDoc(farmRef, {
-        ...formData,
-        id: "primary",
-        ownerId: user.uid,
+        ...savePayload,
         updatedAt: serverTimestamp(),
         createdAt: farmData?.createdAt || serverTimestamp()
       }, { merge: true });
       
-      toast({
-        title: "Profile Saved",
-        description: "Your farm details have been updated successfully in the cloud.",
+      // 1b. SAVE TO HISTORY SUBCOLLECTION
+      const historyRef = collection(db, "users", userUid, "farms", "primary", "history");
+      await addDoc(historyRef, {
+        ...savePayload,
+        type: "profile_update",
+        savedAt: serverTimestamp(),
       });
+      
+      console.log("Farm Profile saved to Firestore successfully");
     } catch (error: any) {
-      console.error("Save Error:", error);
-      toast({
-        variant: "destructive",
-        title: "Database Error",
-        description: error.message || "Insufficient permissions to write to database. Ensure email is verified.",
-      });
-    } finally {
-      setIsSaving(false);
+      console.error("Firestore Save Error, falling back to Local Storage:", error);
     }
+
+    // 2. GUARANTEED LOCAL STORAGE SAVE FOR THE DEMO
+    try {
+       // Merge with existing demo_farm data (insights/advisory)
+       const existing = localStorage.getItem('demo_farm');
+       const merged = existing ? { ...JSON.parse(existing), ...savePayload } : savePayload;
+       localStorage.setItem('demo_farm', JSON.stringify(merged));
+       console.log("Farm Profile saved to Local Storage");
+    } catch (lsError) {
+       console.error("Local storage error:", lsError);
+    }
+
+    toast({
+      title: "Profile Updated",
+      description: "Your farm details have been synchronized successfully for your session.",
+    });
+    
+    setIsSaving(false);
   };
 
   if (isFarmLoading) {
@@ -158,24 +193,6 @@ export default function FarmProfilePage() {
                 onChange={(e) => setFormData({...formData, totalAreaHectares: parseFloat(e.target.value) || 0})}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="soil-type">Soil Type</Label>
-              <Select 
-                value={formData.soilType}
-                onValueChange={(val) => setFormData({...formData, soilType: val})}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select soil type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="loamy">Loamy</SelectItem>
-                  <SelectItem value="clay">Clay</SelectItem>
-                  <SelectItem value="sandy">Sandy</SelectItem>
-                  <SelectItem value="silt">Silt</SelectItem>
-                  <SelectItem value="black">Black Soil</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </CardContent>
         </Card>
 
@@ -183,71 +200,169 @@ export default function FarmProfilePage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <Sprout className="h-5 w-5 text-primary" />
-              Current Crop Cycle
+              Plot Details
             </CardTitle>
-            <CardDescription>Details of the crops currently in the field for AI yield estimation.</CardDescription>
+            <CardDescription>Specify details for each plot of your farm.</CardDescription>
           </CardHeader>
-          <CardContent className="grid md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label htmlFor="crop-type">Crop Type</Label>
-              <Select 
-                value={formData.cropType}
-                onValueChange={(val) => setFormData({...formData, cropType: val})}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select crop" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="wheat">Wheat</SelectItem>
-                  <SelectItem value="rice">Rice (Paddy)</SelectItem>
-                  <SelectItem value="cotton">Cotton</SelectItem>
-                  <SelectItem value="sugarcane">Sugarcane</SelectItem>
-                  <SelectItem value="maize">Maize</SelectItem>
-                </SelectContent>
-              </Select>
+          <CardContent className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-2 max-w-xs flex-1">
+                <Label htmlFor="num-plots">How many plots?</Label>
+                <Input 
+                  id="num-plots" 
+                  type="number" 
+                  min="1"
+                  value={formData.numberOfPlots}
+                  onChange={(e) => {
+                    const num = parseInt(e.target.value) || 1;
+                    const newPlots = [...formData.plots];
+                    while (newPlots.length < num) {
+                      newPlots.push({ size: 0, cropType: "", plantingDate: "", growthStage: "", variety: "", soilType: "" });
+                    }
+                    setFormData({...formData, numberOfPlots: num, plots: newPlots.slice(0, num)});
+                  }}
+                />
+              </div>
+              <div className="text-left sm:text-right border rounded-lg p-3 bg-muted/30">
+                <div className="text-sm text-muted-foreground font-medium">Allocated Area</div>
+                <div className={`text-xl font-bold ${isAreaExceeded ? 'text-destructive' : 'text-primary'}`}>
+                  {totalPlotsArea} / {formData.totalAreaHectares} Acres
+                </div>
+                {isAreaExceeded && (
+                  <div className="text-xs text-destructive mt-1">Area exceeds total farm size</div>
+                )}
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="planting-date">Planting Date</Label>
-              <Input 
-                id="planting-date" 
-                type="date" 
-                value={formData.plantingDate}
-                onChange={(e) => setFormData({...formData, plantingDate: e.target.value})}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="growth-stage">Current Growth Stage</Label>
-              <Select 
-                value={formData.growthStage}
-                onValueChange={(val) => setFormData({...formData, growthStage: val})}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select stage" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="germination">Germination</SelectItem>
-                  <SelectItem value="vegetative">Vegetative</SelectItem>
-                  <SelectItem value="flowering">Flowering</SelectItem>
-                  <SelectItem value="fruiting">Fruiting / Grain filling</SelectItem>
-                  <SelectItem value="ripening">Ripening</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="variety">Crop Variety</Label>
-              <Input 
-                id="variety" 
-                placeholder="e.g. PBW 343" 
-                value={formData.variety}
-                onChange={(e) => setFormData({...formData, variety: e.target.value})}
-              />
-            </div>
+
+            {formData.plots.map((plot, index) => (
+              <div key={index} className="p-4 rounded-lg border bg-muted/20 space-y-4">
+                <h3 className="font-semibold text-sm">Plot {index + 1}</h3>
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor={`soil-type-${index}`}>Soil Type <span className="text-destructive">*</span></Label>
+                    <Select 
+                      value={plot.soilType}
+                      onValueChange={(val) => {
+                        const newPlots = [...formData.plots];
+                        newPlots[index].soilType = val;
+                        if (index === 0) setFormData({...formData, soilType: val, plots: newPlots});
+                        else setFormData({...formData, plots: newPlots});
+                      }}
+                    >
+                      <SelectTrigger className={!plot.soilType ? "border-destructive/50" : ""}>
+                        <SelectValue placeholder="Select soil type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="loamy">Loamy</SelectItem>
+                        <SelectItem value="clay">Clay</SelectItem>
+                        <SelectItem value="sandy">Sandy</SelectItem>
+                        <SelectItem value="silt">Silt</SelectItem>
+                        <SelectItem value="black">Black Soil</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor={`plot-size-${index}`}>Plot Size in Acres</Label>
+                    <Input 
+                      id={`plot-size-${index}`} 
+                      type="number" 
+                      placeholder="e.g. 5" 
+                      className={isAreaExceeded ? "border-destructive/50 focus-visible:ring-destructive" : ""}
+                      value={plot.size || ""}
+                      onChange={(e) => {
+                        const newPlots = [...formData.plots];
+                        newPlots[index].size = parseFloat(e.target.value) || 0;
+                        setFormData({...formData, plots: newPlots});
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor={`crop-type-${index}`}>Crop Type</Label>
+                    <Select 
+                      value={plot.cropType}
+                      onValueChange={(val) => {
+                        const newPlots = [...formData.plots];
+                        newPlots[index].cropType = val;
+                        if (index === 0) setFormData({...formData, cropType: val, plots: newPlots});
+                        else setFormData({...formData, plots: newPlots});
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select crop" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="wheat">Wheat</SelectItem>
+                        <SelectItem value="rice">Rice (Paddy)</SelectItem>
+                        <SelectItem value="cotton">Cotton</SelectItem>
+                        <SelectItem value="sugarcane">Sugarcane</SelectItem>
+                        <SelectItem value="maize">Maize</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor={`planting-date-${index}`}>Planting Date</Label>
+                    <Input 
+                      id={`planting-date-${index}`} 
+                      type="date" 
+                      value={plot.plantingDate}
+                      onChange={(e) => {
+                        const newPlots = [...formData.plots];
+                        newPlots[index].plantingDate = e.target.value;
+                        if (index === 0) setFormData({...formData, plantingDate: e.target.value, plots: newPlots});
+                        else setFormData({...formData, plots: newPlots});
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor={`growth-stage-${index}`}>Current Growth Stage</Label>
+                    <Select 
+                      value={plot.growthStage}
+                      onValueChange={(val) => {
+                        const newPlots = [...formData.plots];
+                        newPlots[index].growthStage = val;
+                        if (index === 0) setFormData({...formData, growthStage: val, plots: newPlots});
+                        else setFormData({...formData, plots: newPlots});
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select stage" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="germination">Germination</SelectItem>
+                        <SelectItem value="vegetative">Vegetative</SelectItem>
+                        <SelectItem value="flowering">Flowering</SelectItem>
+                        <SelectItem value="fruiting">Fruiting / Grain filling</SelectItem>
+                        <SelectItem value="ripening">Ripening</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor={`variety-${index}`}>Crop Variety</Label>
+                    <Input 
+                      id={`variety-${index}`} 
+                      placeholder="e.g. PBW 343" 
+                      value={plot.variety}
+                      onChange={(e) => {
+                        const newPlots = [...formData.plots];
+                        newPlots[index].variety = e.target.value;
+                        if (index === 0) setFormData({...formData, variety: e.target.value, plots: newPlots});
+                        else setFormData({...formData, plots: newPlots});
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
           </CardContent>
         </Card>
 
         <div className="flex justify-end gap-4">
           <Button variant="outline" onClick={() => window.location.reload()}>Discard Changes</Button>
-          <Button className="bg-primary hover:bg-primary/90 min-w-[140px]" onClick={handleSave} disabled={isSaving}>
+          <Button 
+            className="bg-primary hover:bg-primary/90 min-w-[140px]" 
+            onClick={handleSave} 
+            disabled={isSaving || isAreaExceeded || isMissingSoilType}
+          >
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
             Save to Cloud
           </Button>

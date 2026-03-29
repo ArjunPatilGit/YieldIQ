@@ -34,7 +34,7 @@ export default function Home() {
 
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="relative py-20 lg:py-32 overflow-hidden bg-background">
+        <section className="relative py-20 overflow-hidden bg-background">
           <div className="container mx-auto px-4 relative z-10">
             <div className="grid lg:grid-cols-2 gap-12 items-center">
               <div className="space-y-6">
@@ -45,25 +45,22 @@ export default function Home() {
                   Maximize Your Harvest with <span className="text-primary">YieldIQ</span>
                 </h1>
                 <p className="text-xl text-muted-foreground max-w-[600px]">
-                  An intelligent agricultural platform providing high-accuracy yield predictions, 
+                  An intelligent agricultural platform providing high-accuracy yield predictions,
                   resource optimization, and expert advisory in local languages.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 pt-4">
                   <Button size="lg" className="h-12 px-8 text-lg" asChild>
-                    <Link href="/signup">Start Free Trial</Link>
-                  </Button>
-                  <Button size="lg" variant="outline" className="h-12 px-8 text-lg">
-                    Watch Demo
+                    <Link href="/login">Login</Link>
                   </Button>
                 </div>
               </div>
               <div className="relative aspect-video lg:aspect-square rounded-2xl overflow-hidden shadow-2xl">
                 <Image
-                  src={heroImage?.imageUrl || "https://picsum.photos/seed/farm1/800/800"}
-                  alt="Lush green farmland"
+                  src={heroImage?.imageUrl || "/assets/hero-strawberry.png"}
+                  alt="Lush strawberry plantation with mountains"
                   fill
                   className="object-cover"
-                  data-ai-hint="green farm"
+                  priority
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
               </div>
@@ -77,7 +74,7 @@ export default function Home() {
             <div className="text-center space-y-4 mb-16">
               <h2 className="text-3xl md:text-4xl font-bold tracking-tight font-headline">Intelligent Features for Every Farmer</h2>
               <p className="text-muted-foreground max-w-[700px] mx-auto">
-                YieldIQ combines multi-source data including weather, soil, and satellite analysis to provide high-accuracy insights.
+                YieldIQ combines multi-source data including weather, soil to provide high-accuracy insights.
               </p>
             </div>
             <div className="grid md:grid-cols-3 gap-8">
@@ -98,7 +95,7 @@ export default function Home() {
                   icon: Languages
                 },
                 {
-                  title: "GIS Visualization",
+                  title: "GIS Visualizatio",
                   desc: "Interactive field maps powered by Google Earth Engine for visual farm health analysis.",
                   icon: MapIcon
                 },
@@ -108,8 +105,8 @@ export default function Home() {
                   icon: ShieldCheck
                 },
                 {
-                  title: "Real-time Alerts",
-                  desc: "Receive critical updates on weather changes and potential pest outbreaks instantly.",
+                  title: "Cultivation",
+                  desc: "Receive suggestion which crop to be harvest next to gain more profit.",
                   icon: Leaf
                 }
               ].map((feature, i) => (
@@ -135,7 +132,7 @@ export default function Home() {
                 <h2 className="text-3xl md:text-5xl font-bold mb-6 font-headline">Creating a Sustainable Future for Agriculture</h2>
                 <div className="space-y-6 text-primary-foreground/90">
                   <p className="text-lg">
-                    YieldIQ helps farmers adapt to climate changes and improves planning for markets and storage. 
+                    YieldIQ helps farmers adapt to climate changes and improves planning for markets and storage.
                     By reducing losses and optimizing inputs, we contribute to long-term agricultural resilience.
                   </p>
                   <ul className="grid sm:grid-cols-2 gap-4">
@@ -153,7 +150,7 @@ export default function Home() {
                     </li>
                     <li className="flex items-center gap-2">
                       <div className="h-2 w-2 rounded-full bg-accent" />
-                      Food Waste Reduction
+                      High Accuracy
                     </li>
                   </ul>
                 </div>

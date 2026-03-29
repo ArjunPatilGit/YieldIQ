@@ -38,6 +38,11 @@ const items = [
     icon: FileText,
   },
   {
+    title: "Cultivation Strategy",
+    href: "/dashboard/cultivation-strategy",
+    icon: LineChart,
+  },
+  {
     title: "YieldIQ Assistant",
     href: "/dashboard/assistant",
     icon: MessageSquare,

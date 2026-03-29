@@ -2,8 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useUser, useAuth } from "@/firebase";
-import { signOut } from "firebase/auth";
+import { useSession, signOut } from "next-auth/react";
 import { SidebarNav } from "@/components/dashboard/sidebar-nav";
 import { Leaf, User, LogOut, Loader2 } from "lucide-react";
 import Link from "next/link";
@@ -22,37 +21,33 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isUserLoading } = useUser();
-  const auth = useAuth();
+  const { data: session, status } = useSession();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isUserLoading && !user) {
+    if (status === "unauthenticated") {
       router.push("/login");
-    } else if (!isUserLoading && user && !user.emailVerified) {
-      router.push("/verify-email");
     }
-  }, [user, isUserLoading, router]);
+  }, [status, router]);
 
   const handleSignOut = async () => {
-    await signOut(auth);
-    router.push("/");
+    localStorage.removeItem('demo_farm');
+    signOut({ callbackUrl: "/" });
   };
 
-  if (isUserLoading) {
+  if (status === "loading") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-10 w-10 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground font-medium">Loading YieldIQ Dashboard...</p>
+          <p className="text-sm text-muted-foreground font-medium">Authenticating YieldIQ Dashboard...</p>
         </div>
       </div>
     );
   }
 
-  if (!user || !user.emailVerified) {
-    return null; // Will redirect via useEffect
-  }
+  // NextAuth gives us `{ user: { name, email, image } }`
+  const user = session?.user;
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -73,7 +68,7 @@ export default function DashboardLayout({
               <User className="h-4 w-4 text-primary" />
             </div>
             <div className="flex-1 overflow-hidden">
-              <p className="text-sm font-medium truncate">{user?.displayName || "Farmer"}</p>
+              <p className="text-sm font-medium truncate">{user?.name || "Farmer"}</p>
               <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
             </div>
           </div>

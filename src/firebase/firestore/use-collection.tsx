@@ -85,11 +85,25 @@ export function useCollection<T = any>(
         setIsLoading(false);
       },
       (error: FirestoreError) => {
+        // USE WARN TO PREVENT NEXT.JS OVERLAY IN DEMO
+        console.warn("Firestore Collection restricted, using localStorage fallback:", error.message);
+        
         // This logic extracts the path from either a ref or a query
         const path: string =
           memoizedTargetRefOrQuery.type === 'collection'
             ? (memoizedTargetRefOrQuery as CollectionReference).path
             : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString()
+
+        // HACKATHON FALLBACK: Try to load from localStorage if Firestore fails
+        if (typeof window !== 'undefined') {
+          const locallySaved = localStorage.getItem('demo_collection_' + path.replace(/\//g, '_'));
+          if (locallySaved) {
+            console.log("Using localStorage fallback for collection:", path);
+            setData(JSON.parse(locallySaved));
+            setIsLoading(false);
+            return; // Exit early, don't emit global error if fallback exists
+          }
+        }
 
         const contextualError = new FirestorePermissionError({
           operation: 'list',

@@ -7,74 +7,75 @@ import { parseWaterReport } from '@/ai/flows/parse-water-report-flow';
 import { computeAgronomyScores } from '@/lib/agronomy/compute-scores';
 import { personalizedFarmingAdvisory } from '@/ai/flows/personalized-farming-advisory-flow';
 import { getWeatherData } from '@/lib/weather';
-import { initializeFirebase } from '@/firebase';
-import { doc, getDoc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
-export async function generateInsights(userId: string, photoDataUri?: string) {
-  const { firestore } = initializeFirebase();
-  
-  // 1. Fetch farm profile
-  const farmRef = doc(firestore, `users/${userId}/farms/primary`);
-  const farmSnap = await getDoc(farmRef);
-  const farm = farmSnap.data();
+export async function generateInsights(userId: string, farm?: any, plotReports?: (string | null)[]) {
+  // Use provided farm data or fallback to a default mock with multiple plots
+  const activeFarm = farm || {
+    name: 'Patil Farm',
+    location: { lat: 30.2110, lng: 74.9455 },
+    totalAreaHectares: 10,
+    plots: [
+      { plotName: "Plot 1 (North)", cropType: "wheat", size: 6, growthStage: "mid", plantingDate: "2026-11-15", soilType: "black cotton", variety: "PBW 343" },
+      { plotName: "Plot 2 (South)", cropType: "mustard", size: 4, growthStage: "vegetative", plantingDate: "2026-12-01", soilType: "alluvial", variety: "Pusa Bold" }
+    ],
+    irrigationMethod: 'drip'
+  };
 
-  if (!farm) throw new Error("Farm profile not found.");
+  // 1. Process Multi-Plot Reports
+  const plots = activeFarm.plots || [];
+  const parsedReports = await Promise.all(plots.map(async (plot: any, idx: number) => {
+    const reportData = plotReports?.[idx];
+    if (reportData) {
+      return await parseWaterReport({ photoDataUri: reportData });
+    }
+    // FALLBACK: Use already parsed reports if available in the farm profile
+    return activeFarm.parsedReports?.[idx] || activeFarm.waterReport || null;
+  }));
 
-  // 2. Parse Report if provided
-  let waterReport = farm.waterReport;
-  if (photoDataUri) {
-    waterReport = await parseWaterReport({ photoDataUri });
-    await updateDoc(farmRef, {
-      waterReport,
-      waterReportUploadDate: new Date().toISOString(),
-    });
-  }
-
-  // 3. Fetch weather
-  // Mock lat/lng based on location string if not available, or use Bathinda coordinates for demo
-  const lat = 30.2110; 
-  const lng = 74.9455;
+  // 2. Fetch weather using real farm coordinates
+  const lat = activeFarm.location?.lat || 30.2110; 
+  const lng = activeFarm.location?.lng || 74.9455;
   const weather = await getWeatherData(lat, lng);
 
-  // 4. Compute agronomy scores (deterministic)
-  const computed = computeAgronomyScores({
-    ...waterReport,
-    soilType: farm.soilType || 'black cotton',
-    cropType: farm.cropType || 'wheat',
-    growthStage: farm.growthStage || 'mid',
-    irrigationMethod: farm.irrigationMethod || 'flood',
-    previousSeasonYield: farm.previousSeasonYield,
+  // 3. Compute scores for ALL plots with their UNIQUE reports
+  const computedPlots = plots.map((plot: any, idx: number) => {
+    const report = parsedReports[idx];
+    return computeAgronomyScores({
+      ...report, // Extract pH, tds, etc from plot-specific report
+      soilType: plot.soilType || activeFarm.soilType || 'black cotton',
+      cropType: plot.cropType || activeFarm.cropType || 'wheat',
+      growthStage: plot.growthStage || activeFarm.growthStage || 'mid',
+      plantingDate: plot.plantingDate || activeFarm.plantingDate,
+      variety: plot.variety,
+      irrigationMethod: activeFarm.irrigationMethod || 'drip',
+      previousSeasonYield: plot.previousSeasonYield,
+      eto_mmPerDay: weather?.eto,
+      dailyRainfall_mm: weather?.currentRainfall,
+      forecast7dayRain_mm: weather?.forecast7dayRain,
+      currentTempC: weather?.currentTemp,
+      forecastMaxTemp7day: weather?.forecastMaxTemp,
+    });
+  });
+
+  // Summary computed (e.g. for overall farm dashboard stats)
+  const mainComputed = computedPlots[0] || computeAgronomyScores({
+    soilType: activeFarm.soilType || 'black cotton',
+    cropType: activeFarm.cropType || 'wheat',
+    growthStage: activeFarm.growthStage || 'mid',
+    irrigationMethod: activeFarm.irrigationMethod || 'drip',
     eto_mmPerDay: weather?.eto,
-    dailyRainfall_mm: weather?.currentRainfall,
-    forecast7dayRain_mm: weather?.forecast7dayRain,
-    currentTempC: weather?.currentTemp,
-    forecastMaxTemp7day: weather?.forecastMaxTemp,
   });
 
-  // 5. Generate AI advisory
+  // 4. Generate AI advisory with full per-plot data
   const advisory = await personalizedFarmingAdvisory({
-    farm,
-    computed,
+    farm: activeFarm,
+    computed: mainComputed,
+    computedPlots,
     weather,
-    waterReport,
-    preferredLanguage: farm.preferredLanguage || 'en'
+    waterReport: parsedReports[0], // Historic compatibility for overall report
+    waterReports: parsedReports,   // Added for per-plot advisory
+    preferredLanguage: activeFarm.preferredLanguage || 'en'
   });
 
-  // 6. Save results
-  await updateDoc(farmRef, {
-    lastComputedInsights: computed,
-    lastInsightsComputedAt: new Date().toISOString(),
-    latestAdvisory: advisory
-  });
-
-  const reportId = `report_${Date.now()}`;
-  const reportRef = doc(firestore, `users/${userId}/advisory_reports`, reportId);
-  await setDoc(reportRef, {
-    createdAt: serverTimestamp(),
-    advisory,
-    computed,
-    farmSnapshot: farm,
-  });
-
-  return { computed, advisory };
+  return { computed: mainComputed, advisory, computedPlots, parsedReports };
 }

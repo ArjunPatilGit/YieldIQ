@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from "@/firebase";
-import { doc, collection } from "firebase/firestore";
+import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase, doc, collection } from "@/firebase";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -41,6 +40,21 @@ export default function DatabaseExplorerPage() {
       key.toLowerCase().includes(searchQuery.toLowerCase()) || 
       String(val).toLowerCase().includes(searchQuery.toLowerCase())
     );
+  };
+
+  const renderValue = (val: any) => {
+    if (typeof val === 'object' && val !== null) {
+      // Don't stringify dates heavily nested, just return standard json
+      if (val?.seconds || val?._seconds) {
+        return new Date((val.seconds || val._seconds) * 1000).toLocaleString();
+      }
+      return (
+        <pre className="bg-muted p-3 rounded-md text-[10px] overflow-auto max-w-[400px] max-h-[300px] text-accent-foreground border border-primary/20">
+          {JSON.stringify(val, null, 2)}
+        </pre>
+      );
+    }
+    return <span className="text-sm">{String(val)}</span>;
   };
 
   return (
@@ -107,8 +121,8 @@ export default function DatabaseExplorerPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[200px] text-xs uppercase">Field</TableHead>
-                    <TableHead className="text-xs uppercase">Value</TableHead>
+                    <TableHead className="w-[150px] text-xs uppercase">Field</TableHead>
+                    <TableHead className="text-xs uppercase">Value (Raw Data)</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -116,8 +130,8 @@ export default function DatabaseExplorerPage() {
                     <TableRow><TableCell colSpan={2}>Syncing...</TableCell></TableRow>
                   ) : filterData(profileData).map(([key, value]) => (
                     <TableRow key={key}>
-                      <TableCell className="font-mono text-xs text-primary">{key}</TableCell>
-                      <TableCell className="text-sm">{String(value)}</TableCell>
+                      <TableCell className="font-mono text-xs text-primary font-bold align-top pt-4">{key}</TableCell>
+                      <TableCell>{renderValue(value)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -129,7 +143,7 @@ export default function DatabaseExplorerPage() {
         <TabsContent value="farm" className="mt-4">
           <Card className="border-primary/10">
             <CardHeader className="pb-2">
-              <CardTitle className="text-lg">Farm Asset</CardTitle>
+              <CardTitle className="text-lg">Farm Asset & Configurations</CardTitle>
               <CardDescription className="font-mono text-[10px]">Path: .../farms/primary</CardDescription>
             </CardHeader>
             <CardContent>
@@ -137,8 +151,8 @@ export default function DatabaseExplorerPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[200px] text-xs uppercase">Field</TableHead>
-                    <TableHead className="text-xs uppercase">Value</TableHead>
+                    <TableHead className="w-[150px] text-xs uppercase">Field</TableHead>
+                    <TableHead className="text-xs uppercase">Value (Raw Data)</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -146,8 +160,8 @@ export default function DatabaseExplorerPage() {
                     <TableRow><TableCell colSpan={2}>Syncing...</TableCell></TableRow>
                   ) : filterData(farmData).map(([key, value]) => (
                     <TableRow key={key}>
-                      <TableCell className="font-mono text-xs text-accent-foreground">{key}</TableCell>
-                      <TableCell className="text-sm">{String(value)}</TableCell>
+                      <TableCell className="font-mono text-xs text-accent-foreground font-bold align-top pt-4">{key}</TableCell>
+                      <TableCell>{renderValue(value)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

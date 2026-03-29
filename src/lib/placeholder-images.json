@@ -2,9 +2,9 @@
   "placeholderImages": [
     {
       "id": "hero-farm",
-      "description": "Lush green wheat field during sunset",
-      "imageUrl": "https://picsum.photos/seed/farm1/1200/600",
-      "imageHint": "green farm"
+      "description": "Lush strawberry farm with organized rows and plastic mulching",
+      "imageUrl": "/assets/hero-strawberry.png",
+      "imageHint": "strawberry field"
     },
     {
       "id": "crop-analysis",

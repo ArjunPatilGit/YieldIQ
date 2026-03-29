@@ -1,12 +1,10 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useAuth, useFirestore } from "@/firebase";
-import { createUserWithEmailAndPassword, sendEmailVerification, updateProfile } from "firebase/auth";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { useUser } from "@/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,64 +19,19 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   
-  const auth = useAuth();
-  const db = useFirestore();
+  const { user } = useUser();
   const router = useRouter();
   const { toast } = useToast();
 
+  useEffect(() => {
+    if (user) {
+      router.push("/dashboard");
+    }
+  }, [user, router]);
+
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-
-      // Update basic profile in Auth
-      await updateProfile(user, {
-        displayName: `${firstName} ${lastName}`
-      });
-
-      // Send verification email
-      await sendEmailVerification(user);
-
-      // Create UserProfile document in Firestore
-      // This allows admins to see user details (excluding passwords) in the Firebase Console
-      await setDoc(doc(db, "users", user.uid), {
-        id: user.uid,
-        email: email,
-        firstName: firstName,
-        lastName: lastName,
-        preferredLanguage: "en",
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      });
-
-      toast({
-        title: "Account Created",
-        description: "A verification email has been sent to your inbox.",
-      });
-
-      router.push("/verify-email");
-    } catch (error: any) {
-      let errorMessage = "Could not create account.";
-      
-      if (error.code === 'auth/email-already-in-use') {
-        errorMessage = "This email is already registered. Please try signing in instead.";
-      } else if (error.code === 'auth/weak-password') {
-        errorMessage = "Password is too weak. Please use at least 6 characters.";
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage = "Please enter a valid email address.";
-      }
-
-      toast({
-        variant: "destructive",
-        title: "Signup Failed",
-        description: errorMessage,
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    router.push("/dashboard");
   };
 
   return (

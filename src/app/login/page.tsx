@@ -1,11 +1,9 @@
-
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/firebase";
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { useSession, signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,22 +16,56 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const auth = useAuth();
+
+  const { data: session, status } = useSession();
   const router = useRouter();
   const { toast } = useToast();
+  
+  // Handle auth errors from URL (like Google OAuth failures)
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const error = url.searchParams.get("error");
+    
+    if (error === "OAuthSignin" || error === "OAuthCallback") {
+      toast({
+        title: "Authentication Error",
+        description: "Failed to connect with Google. Please check your credentials in .env.local.",
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    if (status === "authenticated") {
+      router.push("/dashboard");
+    }
+  }, [status, router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-
+    
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      router.push("/dashboard");
-    } catch (error: any) {
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        toast({
+          title: "Login failed",
+          description: "Please check your credentials and try again.",
+          variant: "destructive",
+        });
+      } else {
+        router.push("/dashboard");
+      }
+    } catch (error) {
       toast({
+        title: "Something went wrong",
+        description: "An unexpected error occurred. Please try again.",
         variant: "destructive",
-        title: "Login Failed",
-        description: error.message || "Invalid email or password.",
       });
     } finally {
       setIsLoading(false);
@@ -41,20 +73,7 @@ export default function LoginPage() {
   };
 
   const handleGoogleLogin = async () => {
-    setIsLoading(true);
-    const provider = new GoogleAuthProvider();
-    try {
-      await signInWithPopup(auth, provider);
-      router.push("/dashboard");
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Google Sign-In Failed",
-        description: error.message,
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    signIn("google", { callbackUrl: "/dashboard" });
   };
 
   return (

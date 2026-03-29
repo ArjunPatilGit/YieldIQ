@@ -20,23 +20,22 @@ service cloud.firestore {
       // These REQUIRE the owner's email to be verified.
       match /{allSubcollections=**} {
         allow read, write: if request.auth != null 
-          && request.auth.uid == userId 
-          && request.auth.token.email_verified == true;
+          && request.auth.uid == userId;
       }
     }
 
     // --- Global Reference Data ---
     // Accessible by any verified user
     match /crop_types/{id} {
-      allow read: if request.auth != null && request.auth.token.email_verified == true;
+      allow read: if request.auth != null;
     }
     
     match /seasons/{id} {
-      allow read: if request.auth != null && request.auth.token.email_verified == true;
+      allow read: if request.auth != null;
     }
     
     match /consultant_profiles/{id} {
-      allow read: if request.auth != null && request.auth.token.email_verified == true;
+      allow read: if request.auth != null;
     }
 
     // --- Collection Groups ---
